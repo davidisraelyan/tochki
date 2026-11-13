@@ -108,7 +108,18 @@
   .chip.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
 
   .zone{margin-bottom:14px}
-  .zone-h{display:flex;align-items:center;gap:8px;margin:14px 2px 8px}
+  .zone-h{display:flex;align-items:center;gap:8px;margin:14px 2px 8px;cursor:pointer;
+    -webkit-user-select:none;user-select:none}
+  .chev{width:14px;color:var(--muted);font-size:12px;flex:none}
+  .addpoint{width:100%;padding:10px;border:1px dashed var(--line);border-radius:11px;
+    color:var(--muted);font-size:13px;font-weight:600;margin:2px 0 6px}
+  .startline{font-size:13px;color:var(--muted);margin-top:7px}
+  .taskline{width:100%;text-align:left;margin-top:9px;font-size:14px;line-height:1.4;font-weight:600;
+    background:var(--amber-bg);color:var(--amber);border-radius:11px;padding:10px 34px 10px 11px;
+    position:relative;display:block}
+  .taskline.empty-task{background:color-mix(in srgb,var(--ink) 4%,transparent);color:var(--muted);font-weight:500}
+  .taskedit{position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:.7;font-size:13px}
+  .noteview{cursor:pointer}
   .zone-t{font-size:12.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
   .zone-c{margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
   .zone-note{font-size:12.5px;color:var(--amber);background:var(--amber-bg);border-radius:10px;padding:8px 10px;margin-bottom:8px}
@@ -143,6 +154,10 @@
   .st-btn.sel.o{background:var(--green);border-color:var(--green);color:#fff}
   .st-btn.sel.n{background:var(--red);border-color:var(--red);color:#fff}
   .st-btn.sel.p{background:var(--gray);border-color:var(--gray);color:#fff}
+  .btn{border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13px;font-weight:600;
+    color:var(--muted);background:color-mix(in srgb,var(--ink) 3%,transparent);
+    display:inline-flex;align-items:center;gap:5px}
+  .btn.sel{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
   .mini{display:flex;gap:6px;margin-top:8px}
   .mini .btn{border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;
     font-weight:600;color:var(--muted);background:color-mix(in srgb,var(--ink) 3%,transparent)}
@@ -292,6 +307,7 @@
 <div class="sheet" id="sheet">
   <div class="grab"></div>
   <button class="sitem" data-menu="save">📅 Сохранить день</button>
+  <button class="sitem" data-menu="newweek">🔄 Начать новую неделю</button>
   <button class="sitem" data-menu="export">⬇︎ Сохранить копию данных</button>
   <button class="sitem" data-menu="import">⬆︎ Загрузить данные из файла</button>
   <button class="sitem danger" data-menu="reset">↺ Сбросить все статусы</button>
@@ -310,6 +326,18 @@
   <button class="closebtn" id="dateClose2">Закрыть</button>
 </div>
 
+<div class="sheet-bg" id="taskBg"></div>
+<div class="sheet" id="taskSheet">
+  <div class="grab" id="taskGrab"></div>
+  <div class="sheet-head">
+    <div class="sheet-title" id="taskTitle">Важная заметка</div>
+    <button class="xclose" id="taskClose" aria-label="Закрыть">✕</button>
+  </div>
+  <textarea class="note" id="taskText" style="min-height:120px" placeholder="Что важно не забыть в этот день…"></textarea>
+  <button class="closebtn" id="taskSave" style="background:var(--brand);color:var(--brand-ink)">Сохранить</button>
+  <button class="closebtn" id="taskReset">Вернуть исходный текст</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="data.js"></script>
@@ -324,16 +352,16 @@ const ST = {
   pending: { label: "Не были",     short: "⬜", cls: "p" },
 };
 const FLAG = {
-  debt: { label: "Долг",     cls: "" },
-  ret:  { label: "Возврат",  cls: "ret" },
+  debt: { label: "Долг",      cls: "" },
+  ret:  { label: "Возврат",   cls: "ret" },
   call: { label: "Позвонить", cls: "call" },
-  new:  { label: "Новая",    cls: "new" },
+  new:  { label: "Новая",     cls: "new" },
   ask:  { label: "Уточнить",  cls: "call" },
 };
 
 /* ---------- состояние ---------- */
 function todayKey(){
-  const wd = new Date().getDay(); // 0 вс
+  const wd = new Date().getDay();
   return ["sun","mon","tue","wed","thu","fri","sat"][wd];
 }
 function load(){
@@ -341,30 +369,50 @@ function load(){
   try{ s = JSON.parse(localStorage.getItem(KEY) || "null"); }catch(e){}
   if(!s || typeof s !== "object") s = {};
   return {
+    weekStart: s.weekStart || null,
     status: s.status || {},
     notes: s.notes || {},
     addrs: s.addrs || {},
+    phones: s.phones || {},
     checks: s.checks || {},
     history: s.history || {},
-    day: s.day && DAY_INDEX[s.day] !== undefined ? s.day : (DAY_INDEX[todayKey()] !== undefined ? todayKey() : "mon"),
+    dayTasks: s.dayTasks || {},
+    extras: s.extras || {},
+    day: s.day && DAY_INDEX[s.day] !== undefined ? s.day
+         : (DAY_INDEX[todayKey()] !== undefined ? todayKey() : "mon"),
   };
 }
 let state = load();
-let ui = { filter: "all", query: "", openNotes: new Set() };
+let ui = { filter: "all", query: "", openNotes: new Set(), focusNote: null, collapsed: new Set() };
 
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }
   catch(e){ toast("Память браузера недоступна — сделайте копию данных"); }
 }
+
 const statusOf = p => state.status[p.id] || p.st || "pending";
 const noteOf   = p => state.notes[p.id] !== undefined ? state.notes[p.id] : (p.t || "");
 const addrOf   = p => state.addrs[p.id] || p.a || "";
+const phoneOf  = p => state.phones[p.id] || p.phone || "";
 const dayObj   = key => DAYS.find(d => d.key === key) || DAYS[0];
-const pointsOf = key => dayObj(key).zones.flatMap(z => z.points);
+const extrasOf = key => state.extras[key] || [];
+const pointsOf = key => {
+  const base = dayObj(key).zones.flatMap((z, zi) =>
+    z.points.concat((state.extras[key] || []).filter(e => e.zi === zi)));
+  const orphan = (state.extras[key] || []).filter(e => e.zi == null);
+  return base.concat(orphan);
+};
 function countsOf(key){
   const c = { order: 0, noorder: 0, pending: 0, total: 0 };
   pointsOf(key).forEach(p => { c[statusOf(p)]++; c.total++; });
   return c;
+}
+function findPoint(id){
+  for(const d of DAYS) for(const p of pointsOf(d.key)) if(p.id === id) return p;
+  return null;
+}
+function taskOf(key){
+  return state.dayTasks[key] !== undefined ? state.dayTasks[key] : (dayObj(key).task || "");
 }
 
 /* ---------- даты ---------- */
@@ -378,15 +426,44 @@ function dateForDay(key){
   const m = mondayOf(new Date()); const d = new Date(m);
   d.setDate(m.getDate() + DAY_INDEX[key]); return d;
 }
-function snapshot(key){
-  const date = dateForDay(key), s = iso(date), c = countsOf(key);
-  state.history[s] = {
+const MONTHS = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+const MONTHS_GEN = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+function weekLabel(){
+  const m = mondayOf(new Date()); const f = new Date(m); f.setDate(m.getDate() + 4);
+  return m.getDate() + "–" + f.getDate() + " " + MONTHS_GEN[f.getMonth()];
+}
+
+function snapshotTo(key, mondayDate){
+  const d = new Date(mondayDate); d.setDate(d.getDate() + DAY_INDEX[key]);
+  const c = countsOf(key);
+  state.history[iso(d)] = {
     day: key, at: Date.now(), counts: c,
     items: pointsOf(key).map(p => ({ id: p.id, n: p.n, s: statusOf(p), note: noteOf(p) })),
   };
   save();
 }
-const MONTHS = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+const snapshot = key => snapshotTo(key, mondayOf(new Date()));
+
+/* ---------- неделя ---------- */
+function weekStartIso(){ return iso(mondayOf(new Date())); }
+function ensureWeek(){
+  if(!state.weekStart){ state.weekStart = weekStartIso(); save(); return false; }
+  if(state.weekStart === weekStartIso()) return false;
+  archiveAndReset();
+  return true;
+}
+function archiveAndReset(){
+  const old = new Date(state.weekStart + "T00:00:00");
+  DAYS.forEach(d => snapshotTo(d.key, old));
+  state.status = {};
+  state.weekStart = weekStartIso();
+  save();
+}
+function newWeekManual(){
+  archiveAndReset();
+  toast("Новая неделя начата — статусы обнулены");
+  renderAll();
+}
 
 /* ---------- утилиты ---------- */
 const $ = s => document.querySelector(s);
@@ -400,7 +477,7 @@ function openExternal(url){
 let toastTimer;
 function toast(msg){
   const t = $("#toast"); t.textContent = msg; t.classList.add("on");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), 2200);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), 2400);
 }
 
 /* ---------- день ---------- */
@@ -418,12 +495,17 @@ function renderDayHead(){
   const d = dayObj(state.day), c = countsOf(state.day);
   const pct = n => c.total ? (n / c.total * 100) : 0;
   const withAddr = pointsOf(state.day).filter(p => addrOf(p)).length;
+  const task = taskOf(state.day);
   $("#dayhead").innerHTML = `
     <div class="row">
       <div class="name">${esc(d.title)}</div>
-      ${d.start && d.start !== "—" ? `<span class="pill p" style="margin-left:auto">старт: ${esc(d.start)}</span>` : ""}
+      <span class="pill p" style="margin-left:auto">неделя ${weekLabel()}</span>
     </div>
-    ${d.task ? `<div class="task">${esc(d.task)}</div>` : ""}
+    ${d.start && d.start !== "—" ? `<div class="startline">🚗 старт: ${esc(d.start)}</div>` : ""}
+    <button class="taskline ${task ? "" : "empty-task"}" data-act="editTask">
+      ${task ? esc(task) : "＋ добавить важную заметку на этот день"}
+      <span class="taskedit">✎</span>
+    </button>
     <div class="bar" style="margin-top:12px">
       <i class="o" style="width:${pct(c.order)}%"></i><i class="n" style="width:${pct(c.noorder)}%"></i><i class="p" style="width:${pct(c.pending)}%"></i>
     </div>
@@ -440,9 +522,10 @@ function renderDayHead(){
   });
 }
 
-function pointCard(p){
+function pointCard(p, zi){
   const st = statusOf(p), a = addrOf(p), note = noteOf(p), open = ui.openNotes.has(p.id);
   const flags = (p.f || []).map(f => FLAG[f] ? `<span class="flag ${FLAG[f].cls}">${FLAG[f].label}</span>` : "").join("");
+  const extra = !!p.extra;
   return `<article class="card s-${st}" data-id="${p.id}">
     <div class="row">
       <div style="min-width:0"><div class="name">${esc(p.n)}</div>
@@ -458,9 +541,14 @@ function pointCard(p){
              ${esc(a)}</a>
            <button class="addr-add" data-act="addr" title="Изменить адрес">✎</button>`
         : `<button class="addr-add" data-act="addr">＋ адрес</button>`}
+      ${phoneOf(p)
+        ? `<a class="addr" href="tel:${esc(phoneOf(p))}">📞 ${esc(phoneOf(p))}</a>
+           <button class="addr-add" data-act="phone" title="Изменить телефон">✎</button>`
+        : `<button class="addr-add" data-act="phone">＋ телефон</button>`}
     </div>
-    ${note && !open ? `<div class="noteview">📝 ${esc(note)}</div>` : ""}
-    ${open ? `<textarea class="note" data-note placeholder="Что сказали, что привезти…">${esc(note)}</textarea>` : ""}
+    ${note && !open ? `<div class="noteview" data-act="note">📝 ${esc(note)}</div>` : ""}
+    ${open ? `<textarea class="note" data-note placeholder="Что сказали, что привезти…">${esc(note)}</textarea>
+              <button class="btn" data-act="noteDone" style="margin-top:6px">Готово</button>` : ""}
     <div class="acts">
       <button class="st-btn o ${st === "order" ? "sel" : ""}" data-act="order">🟢 Заказали</button>
       <button class="st-btn n ${st === "noorder" ? "sel" : ""}" data-act="noorder">🔴 Не заказали</button>
@@ -468,7 +556,8 @@ function pointCard(p){
     </div>
     <div class="mini">
       <button class="btn ${open ? "sel" : ""}" data-act="note">📝 Заметка</button>
-      ${p.f && p.f.includes("call") ? `<button class="btn" data-act="call">📞 Позвонить</button>` : ""}
+      <button class="btn" data-act="call">📞 Позвонить</button>
+      ${extra ? `<button class="btn" data-act="del" style="margin-left:auto;color:var(--red)">Удалить</button>` : ""}
     </div>
   </article>`;
 }
@@ -476,37 +565,59 @@ function pointCard(p){
 function renderZones(){
   const d = dayObj(state.day);
   const q = ui.query.toLowerCase().trim();
-  let html = "";
-  let shown = 0;
-  d.zones.forEach(z => {
-    let pts = z.points.filter(p => {
+  let html = "", shown = 0;
+  d.zones.forEach((z, zi) => {
+    const all = z.points.concat((state.extras[state.day] || []).filter(e => e.zi === zi));
+    let pts = all.filter(p => {
       if(q && !(p.n + " " + (p.s || "") + " " + (p.a || "")).toLowerCase().includes(q)) return false;
       const st = statusOf(p);
       if(ui.filter === "flags") return (p.f || []).length > 0 || /долг|возврат/i.test(noteOf(p));
       if(ui.filter !== "all" && st !== ui.filter) return false;
       return true;
     });
+    const key = state.day + ":" + zi;
+    const hidden = ui.collapsed.has(key);
+    if(!pts.length && !q) pts = all; // пустые зоны всё равно показываем
     if(!pts.length) return;
     shown += pts.length;
+    const doneN = all.filter(p => statusOf(p) === "order").length;
     html += `<div class="zone">
-      <div class="zone-h"><div class="zone-t">${esc(z.title)}</div>
-        <div class="zone-c">${z.points.filter(p => statusOf(p) === "order").length}/${z.points.length} 🟢</div></div>
-      ${z.note ? `<div class="zone-note">${esc(z.note)}</div>` : ""}
-      ${pts.map(pointCard).join("")}
+      <div class="zone-h" data-zone="${key}">
+        <span class="chev">${hidden ? "▸" : "▾"}</span>
+        <div class="zone-t">${esc(z.title)}</div>
+        <div class="zone-c">${doneN}/${all.length} 🟢</div>
+      </div>
+      ${!hidden && z.note ? `<div class="zone-note">${esc(z.note)}</div>` : ""}
+      ${hidden ? "" : pts.map(p => pointCard(p, zi)).join("")}
+      ${hidden ? "" : `<button class="addpoint" data-add="${zi}">＋ точка в эту зону</button>`}
     </div>`;
   });
+  const orphan = (state.extras[state.day] || []).filter(e => e.zi == null);
+  if(orphan.length){
+    html += `<div class="zone"><div class="zone-h"><span class="chev">▾</span>
+      <div class="zone-t">Добавленные вручную</div></div>
+      ${orphan.map(p => pointCard(p, null)).join("")}</div>`;
+    shown += orphan.length;
+  }
   $("#zones").innerHTML = shown ? html : `<div class="empty">Ничего не найдено.<br>Попробуйте другой фильтр.</div>`;
+
+  if(ui.focusNote){
+    const ta = $("#zones textarea.note");
+    if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    ui.focusNote = null;
+  }
 }
 
 function renderCounts(){
   const c = countsOf(state.day);
   $("#count").textContent = (c.order + c.noorder) + " / " + c.total;
-  $("#sub").textContent = dayObj(state.day).title.toLowerCase();
+  $("#sub").textContent = dayObj(state.day).title.toLowerCase() + " · " + weekLabel();
 }
 
 function renderDay(){
   renderDayChips(); renderDayHead(); renderZones(); renderCounts();
 }
+function renderAll(){ renderDay(); if(!$("#view-cal").hidden) renderCal(); if(!$("#view-tasks").hidden) renderTasks(); }
 
 /* ---------- календарь ---------- */
 let calCursor = new Date();
@@ -526,7 +637,6 @@ function renderCal(){
   const startPad = (first.getDay() + 6) % 7;
   const daysIn = new Date(y, m + 1, 0).getDate();
   const today = iso(new Date());
-  const weekMonday = mondayOf(new Date());
   let cells = "";
   ["пн","вт","ср","чт","пт","сб","вс"].forEach(w => cells += `<div class="cal-wd">${w}</div>`);
   for(let i = 0; i < startPad; i++) cells += `<div class="cal-cell empty"></div>`;
@@ -537,12 +647,10 @@ function renderCal(){
     let inner = `<div class="d">${dd}</div>`;
     if(c && c.total){
       const done = c.order + c.noorder;
-      const allOrders = c.order === c.total;
-      inner += `<div class="s">${c.order}/${c.total}</div><div class="dot ${allOrders ? "" : (done > 0 ? "part" : "none")}"></div>`;
+      inner += `<div class="s">${c.order}/${c.total}</div><div class="dot ${c.order === c.total ? "" : (done > 0 ? "part" : "none")}"></div>`;
     }
     cells += `<button class="cal-cell ${wd > 4 ? "weekend" : ""} ${key === today ? "today" : ""} ${c ? "filled" : ""}" data-date="${key}">${inner}</button>`;
   }
-  // добиваем до 7
   const total = startPad + daysIn;
   for(let i = total; i % 7 !== 0; i++) cells += `<div class="cal-cell empty"></div>`;
   $("#calGrid").innerHTML = cells;
@@ -552,12 +660,12 @@ function renderCal(){
     const c = dayCountsForDate(new Date(y, m, dd));
     if(c){ days++; orders += c.order; pt += c.total; }
   }
-  const withAddr = DAYS.flatMap(d => d.zones.flatMap(z => z.points)).filter(p => addrOf(p)).length;
+  const withAddr = DAYS.flatMap(d => pointsOf(d.key)).filter(p => addrOf(p)).length;
   $("#calSum").innerHTML = `
     <div><b>${days}</b> дн. с маршрутом · заказов: <b>${orders}</b> · точек в маршруте: <b>${pt}</b></div>
     <div style="color:var(--muted);font-size:12.5px;margin-top:6px">
-      Сегодня сохраняется автоматически при каждой отметке.
-      Адреса указаны у ${withAddr} точек — добавьте остальные кнопкой «＋ адрес», и появится маршрут по картам.
+      Неделя повторяется: в понедельник статусы обнуляются сами, точки и адреса остаются.
+      Адреса указаны у ${withAddr} точек — добавьте остальные кнопкой «＋ адрес».
     </div>`;
 }
 
@@ -573,8 +681,9 @@ function openDate(key){
   if(h && !Array.isArray(h.items)) h.items = [];
   const title = date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" }) + (live ? " · сейчас" : "");
   $("#dateTitle").textContent = title;
-  if(!h){ $("#dateBody").innerHTML = `<div class="hint">За этот день записей нет.</div>`; }
-  else {
+  if(!h){
+    $("#dateBody").innerHTML = `<div class="hint">За этот день записей нет.</div>`;
+  } else {
     const c = h.counts;
     const groups = [["order","🟢 Заказали"],["noorder","🔴 Не заказали"],["pending","⬜ Не были"]];
     $("#dateBody").innerHTML = `
@@ -585,7 +694,15 @@ function openDate(key){
         return `<div class="sect-t">${label} · ${items.length}</div>` +
           items.map(i => `<div class="ditem"><span class="n">${esc(i.n)}</span>
             ${i.note ? `<span style="color:var(--muted);font-size:12.5px">${esc(i.note)}</span>` : ""}</div>`).join("");
-      }).join("")}`;
+      }).join("")}
+      ${live ? `<button class="closebtn" id="jumpDay">Открыть этот день в списке</button>` : ""}`;
+    if(live){
+      const dk = ["mon","tue","wed","thu","fri"][diff];
+      $("#jumpDay").addEventListener("click", () => {
+        closeDate(); state.day = dk; save(); renderDay();
+        document.querySelector('.tab[data-tab="day"]').click();
+      });
+    }
   }
   $("#dateSheet").classList.add("on"); $("#dateBg").classList.add("on");
 }
@@ -597,39 +714,85 @@ function renderTasks(){
       <div class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>
       <div class="txt">${esc(t.text)}</div>
     </div>`).join("");
-  $("#dayTasks").innerHTML = DAYS.filter(d => d.task).map(d => `
-    <div class="task" style="border-left:3px solid var(--brand)">
-      <div class="box" style="border-radius:50%;border-color:var(--line)"></div>
-      <div class="txt"><b>${esc(d.title)}</b><br>${esc(d.task)}</div>
-    </div>`).join("") || `<div class="empty">Задач по дням нет.</div>`;
+  $("#dayTasks").innerHTML = DAYS.map(d => {
+    const t = taskOf(d.key);
+    return `<div class="task" data-taskday="${d.key}" style="border-left:3px solid var(--brand)">
+      <div class="box" style="border-radius:50%"></div>
+      <div class="txt"><b>${esc(d.title)}</b><br>${t ? esc(t) : `<span style="color:var(--muted)">＋ добавить задачу</span>`}</div>
+    </div>`;
+  }).join("");
 }
 
-/* ---------- действия с точкой ---------- */
-function findPoint(id){
-  for(const d of DAYS) for(const z of d.zones) for(const p of z.points) if(p.id === id) return p;
-  return null;
-}
+/* ---------- действия ---------- */
 function setStatus(id, st){
   const p = findPoint(id); if(!p) return;
   state.status[id] = state.status[id] === st ? "pending" : st;
-  if(state.status[id] === (p.st || "pending") && !state.status[id]) delete state.status[id];
   save(); snapshot(state.day); renderDay();
 }
 function toggleNote(id){
-  ui.openNotes.has(id) ? ui.openNotes.delete(id) : ui.openNotes.add(id);
+  if(ui.openNotes.has(id)) ui.openNotes.delete(id);
+  else { ui.openNotes.add(id); ui.focusNote = id; }
   renderZones();
 }
 function editAddr(id){
   const p = findPoint(id); if(!p) return;
-  const cur = addrOf(p);
-  const v = prompt("Адрес точки (город, улица, дом):", cur);
+  const v = prompt("Адрес точки (город, улица, дом):", addrOf(p));
   if(v === null) return;
   const t = v.trim();
   if(t) state.addrs[id] = t; else delete state.addrs[id];
   save(); renderZones();
 }
+function editPhone(id){
+  const p = findPoint(id); if(!p) return;
+  const v = prompt("Телефон:", phoneOf(p));
+  if(v === null) return;
+  const t = v.trim();
+  if(t) state.phones[id] = t; else delete state.phones[id];
+  save(); renderZones();
+}
+function addPoint(zi){
+  const name = prompt("Название новой точки:");
+  if(!name || !name.trim()) return;
+  const addr = prompt("Адрес (можно пропустить):", "") || "";
+  const id = "x" + Date.now().toString(36);
+  (state.extras[state.day] = state.extras[state.day] || []).push({
+    id, n: name.trim(), a: addr.trim(), s: "", pay: "", st: "pending", extra: true, zi,
+  });
+  save(); snapshot(state.day); renderDay(); toast("Точка добавлена");
+}
+function delPoint(id){
+  for(const k of Object.keys(state.extras)){
+    const i = state.extras[k].findIndex(p => p.id === id);
+    if(i >= 0){
+      if(!confirm("Удалить эту точку?")) return;
+      state.extras[k].splice(i, 1); save(); snapshot(k); renderDay(); toast("Точка удалена");
+      return;
+    }
+  }
+}
 
-/* ---------- обработчики UI ---------- */
+/* ---------- редактирование задачи дня ---------- */
+let taskEditKey = null;
+function openTaskEditor(key){
+  taskEditKey = key;
+  $("#taskTitle").textContent = "Важная заметка · " + dayObj(key).title;
+  $("#taskText").value = taskOf(key);
+  $("#taskBg").classList.add("on"); $("#taskSheet").classList.add("on");
+  setTimeout(() => $("#taskText").focus(), 120);
+}
+function closeTaskEditor(){
+  $("#taskSheet").classList.remove("on"); $("#taskBg").classList.remove("on");
+}
+function saveTask(){
+  if(!taskEditKey) return;
+  const v = $("#taskText").value.trim();
+  if(v) state.dayTasks[taskEditKey] = v; else delete state.dayTasks[taskEditKey];
+  save(); closeTaskEditor(); renderDay();
+  if(!$("#view-tasks").hidden) renderTasks();
+  toast("Сохранено");
+}
+
+/* ---------- обработчики ---------- */
 $("#daychips").addEventListener("click", e => {
   const b = e.target.closest("[data-day]"); if(!b) return;
   snapshot(state.day);
@@ -638,22 +801,30 @@ $("#daychips").addEventListener("click", e => {
   requestAnimationFrame(() => window.scrollTo(0, 0));
 });
 
+$("#dayhead").addEventListener("click", e => {
+  if(e.target.closest('[data-act="editTask"]')) openTaskEditor(state.day);
+});
+
 let noteTimer;
 $("#zones").addEventListener("click", e => {
+  const zone = e.target.closest("[data-zone]");
+  if(zone){ const k = zone.dataset.zone; ui.collapsed.has(k) ? ui.collapsed.delete(k) : ui.collapsed.add(k); renderZones(); return; }
+  const addBtn = e.target.closest("[data-add]");
+  if(addBtn) return addPoint(Number(addBtn.dataset.add));
   const act = e.target.closest("[data-act]");
   const card = e.target.closest("[data-id]");
-  if(!card) return;
-  const id = card.dataset.id;
-  if(!act) return;
-  const a = act.dataset.act;
+  if(!act || !card) return;
+  const id = card.dataset.id, a = act.dataset.act;
   if(a === "order" || a === "noorder" || a === "pending") return setStatus(id, a);
   if(a === "note") return toggleNote(id);
   if(a === "addr") return editAddr(id);
+  if(a === "phone") return editPhone(id);
+  if(a === "del") return delPoint(id);
+  if(a === "noteDone"){ ui.openNotes.delete(id); snapshot(state.day); renderZones(); return; }
   if(a === "call"){
     const p = findPoint(id);
-    const digits = (p && p.phone) || "";
-    if(digits) openExternal("tel:" + digits);
-    else toast("Телефон не указан — добавим позже");
+    if(phoneOf(p)) openExternal("tel:" + phoneOf(p).replace(/[^\d+]/g, ""));
+    else editPhone(id);
   }
 });
 $("#zones").addEventListener("input", e => {
@@ -689,6 +860,7 @@ $("#calGrid").addEventListener("click", e => {
   const c = e.target.closest("[data-date]"); if(!c) return;
   openDate(c.dataset.date);
 });
+
 function closeDate(){
   $("#dateSheet").classList.remove("on");
   $("#dateBg").classList.remove("on");
@@ -697,7 +869,13 @@ $("#dateBg").addEventListener("click", closeDate);
 $("#dateClose").addEventListener("click", closeDate);
 $("#dateClose2").addEventListener("click", closeDate);
 $("#dateGrab").addEventListener("click", closeDate);
-document.addEventListener("keydown", e => { if(e.key === "Escape") closeDate(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape"){ closeDate(); closeTaskEditor(); } });
+
+$("#taskBg").addEventListener("click", closeTaskEditor);
+$("#taskClose").addEventListener("click", closeTaskEditor);
+$("#taskGrab").addEventListener("click", closeTaskEditor);
+$("#taskSave").addEventListener("click", saveTask);
+$("#taskReset").addEventListener("click", () => { $("#taskText").value = dayObj(taskEditKey).task || ""; });
 
 $("#checkList").addEventListener("click", e => {
   const t = e.target.closest("[data-check]"); if(!t) return;
@@ -705,8 +883,11 @@ $("#checkList").addEventListener("click", e => {
   state.checks[id] = !state.checks[id];
   save(); renderTasks();
 });
+$("#dayTasks").addEventListener("click", e => {
+  const t = e.target.closest("[data-taskday]"); if(!t) return;
+  openTaskEditor(t.dataset.taskday);
+});
 
-/* меню */
 const sheet = $("#sheet"), sheetBg = $("#sheetBg");
 function openSheet(v){ sheet.classList.toggle("on", v); sheetBg.classList.toggle("on", v); }
 $("#menuBtn").addEventListener("click", () => openSheet(true));
@@ -716,16 +897,20 @@ sheet.addEventListener("click", e => {
   const what = b.dataset.menu;
   openSheet(false);
   if(what === "save"){ snapshot(state.day); toast("День сохранён"); }
+  if(what === "newweek"){
+    if(!confirm("Начать новую неделю? Статусы обнулятся, точки и адреса останутся. Прошлая неделя сохранится в календаре.")) return;
+    newWeekManual();
+  }
   if(what === "export") exportJson();
   if(what === "import") $("#fileIn").click();
   if(what === "reset"){
-    if(!confirm("Сбросить все статусы точек (🟢/🔴/⬜)? Заметки и адреса останутся.")) return;
+    if(!confirm("Сбросить статусы точек (🟢/🔴/⬜)? Заметки и адреса останутся.")) return;
     state.status = {}; save(); snapshot(state.day); renderDay(); toast("Статусы сброшены");
   }
 });
 
 function exportJson(){
-  const data = JSON.stringify({ app: "tochki", version: 2, at: new Date().toISOString(), state }, null, 2);
+  const data = JSON.stringify({ app: "tochki", version: 3, at: new Date().toISOString(), state }, null, 2);
   const blob = new Blob([data], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -741,9 +926,13 @@ $("#fileIn").addEventListener("change", e => {
     try{
       const obj = JSON.parse(r.result);
       const s = obj.state || obj;
-      if(!s || typeof s !== "object" || !s.status) throw new Error("не тот формат");
-      state = { status: s.status || {}, notes: s.notes || {}, addrs: s.addrs || {},
-                checks: s.checks || {}, history: s.history || {}, day: state.day };
+      if(!s || typeof s !== "object" || !s.status) throw new Error("формат");
+      state = {
+        weekStart: s.weekStart || weekStartIso(),
+        status: s.status || {}, notes: s.notes || {}, addrs: s.addrs || {}, phones: s.phones || {},
+        checks: s.checks || {}, history: s.history || {}, dayTasks: s.dayTasks || {},
+        extras: s.extras || {}, day: state.day,
+      };
       save(); renderDay(); toast("Данные загружены");
     }catch(err){ toast("Не получилось прочитать файл"); }
   };
@@ -751,8 +940,10 @@ $("#fileIn").addEventListener("change", e => {
   e.target.value = "";
 });
 
-/* старт */
+/* ---------- старт ---------- */
+const weekChanged = ensureWeek();
 renderDay();
+if(weekChanged) toast("Новая неделя — статусы обнулены, маршрут прежний");
 (function startTab(){
   const t = new URLSearchParams(location.search).get("tab");
   if(t === "cal" || t === "tasks"){
@@ -761,12 +952,13 @@ renderDay();
   }
 })();
 document.addEventListener("visibilitychange", () => {
-  if(document.visibilityState === "hidden") snapshot(state.day);
+  if(document.visibilityState === "hidden"){ snapshot(state.day); }
+  else if(ensureWeek()) renderAll();
 });
-
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
+
 </script>
 </body>
 </html>
