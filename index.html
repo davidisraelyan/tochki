@@ -218,6 +218,12 @@
   .cal-cell .dot.part{background:var(--amber)}
   .cal-cell .dot.none{background:var(--gray)}
   .cal-cell.empty{border-color:transparent;background:transparent}
+  .daymarks{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+  .daybadge{border:1px solid var(--line);background:var(--card);border-radius:999px;
+    padding:6px 11px;font-size:12.5px;font-weight:700;color:var(--brand)}
+  .datebar{display:flex;align-items:center;gap:10px;margin:12px 0 10px}
+  .datebar-mid{flex:1;min-width:0}
+  .datebar-mid .hint{padding:2px 0 0}
   .cal-sum{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;
     padding:12px 14px;box-shadow:var(--shadow);font-size:14px;line-height:1.55}
   .cal-sum b{font-weight:700}
@@ -314,10 +320,23 @@
   </section>
 
   <section id="view-tasks" hidden>
-    <div class="sect-t">Чек-лист недели</div>
-    <div id="checkList"></div>
-    <div class="sect-t">Задачи по дням</div>
-    <div id="dayTasks"></div>
+    <div class="datebar">
+      <button class="cal-nav" id="tPrev">‹</button>
+      <div class="datebar-mid">
+        <div class="cal-title" id="tTitle">—</div>
+        <div class="hint" id="tSub"></div>
+      </div>
+      <button class="cal-nav" id="tNext">›</button>
+    </div>
+    <div class="mini" style="margin:0 0 6px">
+      <button class="btn" id="tToday">Сегодня</button>
+      <button class="btn" id="tRouteDay">Открыть этот день в маршруте</button>
+    </div>
+    <div class="sect-t">Заметка на этот день</div>
+    <textarea class="note" id="tNote" placeholder="Что важно не забыть в этот день…"></textarea>
+    <div class="sect-t">Задачи на этот день</div>
+    <div id="tList"></div>
+    <button class="addzone" id="tAdd">＋ задача на этот день</button>
   </section>
 </main>
 
@@ -451,6 +470,7 @@ function load(){
     order: s.order || {},
     dayNotes: s.dayNotes || {},
     dayTodos: s.dayTodos || {},
+    tasksDate: s.tasksDate || null,
     zoneTitles: s.zoneTitles || {},
     zoneNotes: s.zoneNotes || {},
     zoneHidden: s.zoneHidden || {},
@@ -628,6 +648,9 @@ function renderDayChips(){
 
 function renderDayHead(){
   const d = dayObj(state.day), c = countsOf(state.day);
+  const dateIso = iso(dateForDay(state.day));
+  const note = state.dayNotes[dateIso] || "";
+  const todos = state.dayTodos[dateIso] || [];
   const pct = n => c.total ? (n / c.total * 100) : 0;
   const withAddr = pointsOf(state.day).filter(p => addrOf(p)).length;
   const task = taskOf(state.day);
@@ -640,6 +663,10 @@ function renderDayHead(){
       ${task ? esc(task) : "＋ добавить важную заметку на этот день"}
       <span class="taskedit">✎</span>
     </button>
+    ${(note || todos.length) ? `<div class="daymarks">
+      ${note ? `<button class="daybadge" data-act="openTasks">📝 заметка</button>` : ""}
+      ${todos.length ? `<button class="daybadge" data-act="openTasks">✓ задачи ${todos.filter(t => t.done).length}/${todos.length}</button>` : ""}
+    </div>` : ""}
     <div class="bar" style="margin-top:12px">
       <i class="o" style="width:${pct(c.order)}%"></i><i class="n" style="width:${pct(c.noorder)}%"></i><i class="p" style="width:${pct(c.pending)}%"></i>
     </div>
@@ -705,7 +732,6 @@ function pointCard(p){
       <button class="btn" data-act="edit">✎ Изменить</button>
       <button class="btn" data-act="up" title="Выше">↑</button>
       <button class="btn" data-act="down" title="Ниже">↓</button>
-      ${state.compact ? `<button class="btn" data-act="collapse">Свернуть</button>` : ""}
     </div>
   </article>`;
 }
@@ -760,7 +786,7 @@ function renderCounts(){
 function renderDay(){
   renderDayChips(); renderDayHead(); renderZones(); renderCounts();
 }
-function renderAll(){ renderDay(); if(!$("#view-cal").hidden) renderCal(); if(!$("#view-tasks").hidden) renderTasks(); }
+function renderAll(){ renderDay(); if(!$("#view-cal").hidden) renderCal(); if(!$("#view-tasks").hidden) renderTasksTab(); }
 
 /* ---------- календарь ---------- */
 let calCursor = new Date();
@@ -872,24 +898,33 @@ function dayExtraHtml(key){
 }
 
 /* ---------- задачи ---------- */
-function renderTasks(){
-  $("#checkList").innerHTML = state.checksList.map(t => `
-    <div class="task ${state.checks[t.id] ? "done" : ""}" data-check="${t.id}">
-      <div class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>
-      <div class="txt">${esc(t.text)}</div>
-      <button class="tiny" data-checkedit="${t.id}" title="Изменить">✎</button>
-      <button class="tiny danger" data-checkdel="${t.id}" title="Удалить">✕</button>
-    </div>`).join("") + `<button class="addzone" id="checkAdd">＋ пункт чек-листа</button>`;
-
-  $("#dayTasks").innerHTML = DAYS.map(d => {
-    const t = taskOf(d.key);
-    return `<div class="task" data-taskday="${d.key}" style="border-left:3px solid var(--brand)">
-      <div class="box" style="border-radius:50%"></div>
-      <div class="txt"><b>${esc(d.title)}</b><br>${t ? esc(t) : `<span style="color:var(--muted)">＋ добавить задачу</span>`}</div>
-    </div>`;
-  }).join("");
+function renderTasksTab(){
+  const d = new Date(taskIso + "T00:00:00");
+  $("#tTitle").textContent = d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  const wd = d.toLocaleDateString("ru-RU", { weekday: "long" });
+  const isToday = taskIso === iso(new Date());
+  const inWeek = (() => {
+    const m = mondayOf(new Date()), dd = Math.round((d - m) / 86400000);
+    return dd >= 0 && dd <= 4 ? ["mon","tue","wed","thu","fri"][dd] : null;
+  })();
+  $("#tSub").textContent = wd + (isToday ? " · сегодня" : "") + (inWeek ? "" : " · вне текущего маршрута");
+  $("#tNote").value = state.dayNotes[taskIso] || "";
+  const todos = state.dayTodos[taskIso] || [];
+  $("#tList").innerHTML = todos.length
+    ? todos.map(t => `<div class="task ${t.done ? "done" : ""}" data-ttodo="${t.id}">
+        <div class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>
+        <div class="txt">${esc(t.text)}</div>
+        <button class="tiny danger" data-ttodel="${t.id}">✕</button>
+      </div>`).join("")
+    : `<div class="hint" style="padding:2px 6px 6px">Задач на этот день нет.</div>`;
+  $("#tRouteDay").hidden = !inWeek;
+  if(inWeek && state.day !== inWeek){ state.day = inWeek; save(); renderDay(); }
 }
-
+function openTasksFor(isoDate){
+  taskIso = isoDate;
+  state.tasksDate = isoDate; save();
+  document.querySelector('.tab[data-tab="tasks"]').click();
+}
 /* ---------- действия с точками ---------- */
 function setStatus(id, st){
   const p = findPoint(id); if(!p) return;
@@ -1058,8 +1093,7 @@ function saveTask(){
   const v = $("#taskText").value.trim();
   if(v) state.dayTasks[taskEditKey] = v; else delete state.dayTasks[taskEditKey];
   save(); closeTaskEditor(); renderDay();
-  if(!$("#view-tasks").hidden) renderTasks();
-  toast("Сохранено");
+    toast("Сохранено");
 }
 
 /* ---------- обработчики ---------- */
@@ -1076,6 +1110,7 @@ $("#dayhead").addEventListener("click", e => {
   const a = t.dataset.act;
   if(a === "editTask") openTaskEditor(state.day);
   if(a === "toggleView"){ state.compact = !state.compact; save(); renderDay(); }
+  if(a === "openTasks"){ openTasksFor(iso(dateForDay(state.day))); return; }
   if(a === "route"){
     const addrs = pointsOf(state.day).filter(p => addrOf(p)).map(p => addrOf(p));
     if(addrs.length) openExternal("https://yandex.ru/maps/?rtt=auto&rtext=" + addrs.map(encodeURIComponent).join("~"));
@@ -1141,7 +1176,7 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
   $("#view-cal").hidden = v !== "cal";
   $("#view-tasks").hidden = v !== "tasks";
   if(v === "cal") renderCal();
-  if(v === "tasks") renderTasks();
+  if(v === "tasks") renderTasksTab();
   requestAnimationFrame(() => window.scrollTo(0, 0));
 }));
 
@@ -1219,38 +1254,52 @@ $("#taskSave").addEventListener("click", saveTask);
 $("#taskReset").addEventListener("click", () => { $("#taskText").value = dayObj(taskEditKey).task || ""; });
 
 /* чек-лист */
-$("#checkList").addEventListener("click", e => {
-  const edit = e.target.closest("[data-checkedit]");
-  const del = e.target.closest("[data-checkdel]");
-  const t = e.target.closest("[data-check]");
-  if(edit){
-    const item = state.checksList.find(x => x.id === edit.dataset.checkedit);
-    const v = prompt("Текст пункта:", item.text);
-    if(v !== null && v.trim()){ item.text = v.trim(); save(); renderTasks(); }
-    return;
-  }
-  if(del){
-    if(!confirm("Удалить пункт?")) return;
-    state.checksList = state.checksList.filter(x => x.id !== del.dataset.checkdel);
-    save(); renderTasks(); return;
-  }
-  if(t){
-    const id = t.dataset.check;
-    state.checks[id] = !state.checks[id];
-    save(); renderTasks();
-  }
-});
 $("#view-tasks").addEventListener("click", e => {
-  if(e.target.closest("#checkAdd")){
-    const v = prompt("Новый пункт чек-листа:");
+  if(e.target.closest("#tAdd")){
+    const v = prompt("Задача на этот день:");
     if(v && v.trim()){
-      state.checksList.push({ id: "c" + Date.now().toString(36), text: v.trim() });
-      save(); renderTasks();
+      (state.dayTodos[taskIso] = state.dayTodos[taskIso] || []).push({ id: "t" + Date.now().toString(36), text: v.trim(), done: false });
+      save(); renderTasksTab(); renderDay();
     }
     return;
   }
-  const d = e.target.closest("[data-taskday]");
-  if(d) openTaskEditor(d.dataset.taskday);
+  if(e.target.closest("#tToday")){
+    openTasksFor(iso(new Date()));
+    renderTasksTab();
+    return;
+  }
+  if(e.target.closest("#tRouteDay")){
+    const m = mondayOf(new Date()), dd = Math.round((new Date(taskIso + "T00:00:00") - m) / 86400000);
+    if(dd >= 0 && dd <= 4){
+      state.day = ["mon","tue","wed","thu","fri"][dd]; save(); renderDay();
+      document.querySelector('.tab[data-tab="day"]').click();
+    }
+    return;
+  }
+  const del = e.target.closest("[data-ttodel]");
+  if(del){
+    state.dayTodos[taskIso] = (state.dayTodos[taskIso] || []).filter(t => t.id !== del.dataset.ttodel);
+    save(); renderTasksTab(); renderDay(); return;
+  }
+  const t = e.target.closest("[data-ttodo]");
+  if(t){
+    const item = (state.dayTodos[taskIso] || []).find(x => x.id === t.dataset.ttodo);
+    if(item){ item.done = !item.done; save(); renderTasksTab(); renderDay(); }
+  }
+});
+$("#tPrev").addEventListener("click", () => {
+  const d = new Date(taskIso + "T00:00:00"); d.setDate(d.getDate() - 1);
+  taskIso = iso(d); state.tasksDate = taskIso; save(); renderTasksTab();
+});
+$("#tNext").addEventListener("click", () => {
+  const d = new Date(taskIso + "T00:00:00"); d.setDate(d.getDate() + 1);
+  taskIso = iso(d); state.tasksDate = taskIso; save(); renderTasksTab();
+});
+let tNoteTimer;
+$("#tNote").addEventListener("input", e => {
+  state.dayNotes[taskIso] = e.target.value;
+  clearTimeout(tNoteTimer);
+  tNoteTimer = setTimeout(() => { save(); renderDay(); }, 400);
 });
 
 const sheet = $("#sheet"), sheetBg = $("#sheetBg");
@@ -1341,6 +1390,7 @@ async function offlineStatus(){
 }
 
 /* ---------- старт ---------- */
+let taskIso = state.tasksDate || iso(new Date());
 const weekChanged = ensureWeek();
 renderDay();
 if(weekChanged) toast("Новая неделя — статусы обнулены, маршрут прежний");
