@@ -62,6 +62,8 @@
     background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 12px;
     box-shadow:var(--shadow);white-space:nowrap;
   }
+  .netbadge{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    color:#fff;background:#b42318;border-radius:999px;padding:5px 9px;white-space:nowrap}
   .iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
     background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);flex:none}
   .iconbtn svg{width:20px;height:20px}
@@ -274,6 +276,7 @@
     <div class="h-title">Точки</div>
     <div class="h-sub" id="sub">маршрут недели</div>
   </div>
+  <span class="netbadge" id="netBadge" hidden>офлайн</span>
   <div class="h-count" id="count">0 / 0</div>
   <button class="iconbtn" id="menuBtn" aria-label="Меню">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
@@ -338,6 +341,7 @@
   <button class="sitem" data-menu="newweek">🔄 Начать новую неделю</button>
   <button class="sitem" data-menu="restorezones">↩︎ Вернуть скрытые зоны</button>
   <button class="sitem" data-menu="restorepoints">↩︎ Вернуть удалённые точки</button>
+  <button class="sitem" data-menu="offline">📴 Статус офлайн-режима</button>
   <button class="sitem" data-menu="export">⬇︎ Сохранить копию данных</button>
   <button class="sitem" data-menu="import">⬆︎ Загрузить данные из файла</button>
   <button class="sitem danger" data-menu="reset">↺ Сбросить все статусы</button>
@@ -1182,6 +1186,7 @@ sheet.addEventListener("click", e => {
     newWeekManual();
   }
   if(what === "restorezones") restoreZones();
+  if(what === "offline") offlineStatus();
   if(what === "restorepoints"){
     state.removed = {}; save(); renderDay(); toast("Удалённые точки возвращены");
   }
@@ -1228,6 +1233,31 @@ $("#fileIn").addEventListener("change", e => {
   e.target.value = "";
 });
 
+/* ---------- сеть и офлайн ---------- */
+function updateNet(){
+  const b = $("#netBadge");
+  if(b) b.hidden = navigator.onLine;
+}
+window.addEventListener("online", updateNet);
+window.addEventListener("offline", updateNet);
+updateNet();
+
+async function offlineStatus(){
+  let active = false, files = 0;
+  try{
+    const reg = await navigator.serviceWorker.getRegistration();
+    active = !!(reg && reg.active);
+    const keys = await caches.keys();
+    const name = keys.find(k => k.indexOf("tochki") === 0) || keys[keys.length - 1];
+    if(name){ const c = await caches.open(name); files = (await c.keys()).length; }
+  }catch(_){}
+  alert("Офлайн-режим\n\n" +
+    (active ? "Кэш активен — приложение откроется без сети ✅" : "Кэш ещё не готов. Откройте приложение один раз при интернете и добавьте его на экран «Домой».") +
+    "\nФайлов в кэше: " + files +
+    "\nСеть сейчас: " + (navigator.onLine ? "есть" : "нет") +
+    "\n\nДанные (статусы, заметки, адреса) хранятся в памяти телефона и без сети работают как обычно.");
+}
+
 /* ---------- старт ---------- */
 const weekChanged = ensureWeek();
 renderDay();
@@ -1243,8 +1273,20 @@ document.addEventListener("visibilitychange", () => {
   if(document.visibilityState === "hidden"){ snapshot(state.day); }
   else if(ensureWeek()) renderAll();
 });
+if(navigator.storage && navigator.storage.persist){
+  navigator.storage.persist().catch(() => {});
+}
 if("serviceWorker" in navigator){
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").then(() => {
+      let ready = false;
+      try{ ready = localStorage.getItem("tochki_offline_ready") === "1"; }catch(_){}
+      if(!ready){
+        try{ localStorage.setItem("tochki_offline_ready", "1"); }catch(_){}
+        setTimeout(() => toast("Сохранено для работы без сети"), 1200);
+      }
+    }).catch(() => {});
+  });
 }
 
 </script>
