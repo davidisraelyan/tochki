@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Точки — обход</title>
+<title>Точки — маршрут</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,6 +20,7 @@
     --green:#15803d; --green-bg:#e6f6ec;
     --red:#b42318; --red-bg:#fdeceb;
     --amber:#a16207; --amber-bg:#fdf3dc;
+    --gray:#6b7280; --gray-bg:#eef0f0;
     --shadow:0 1px 2px rgba(16,40,28,.06),0 6px 18px rgba(16,40,28,.06);
     --r:16px;
   }
@@ -30,173 +31,189 @@
       --green:#6ee7a4; --green-bg:#12301f;
       --red:#fca5a5; --red-bg:#3a1514;
       --amber:#fcd34d; --amber-bg:#3a2a0a;
+      --gray:#9aa6a0; --gray-bg:#1d2721;
       --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 22px rgba(0,0,0,.35);
     }
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0}
+  html,body{margin:0;padding:0;overflow-x:hidden}
   body{
     background:var(--bg); color:var(--ink);
     font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
-    -webkit-text-size-adjust:100%;
-    -webkit-tap-highlight-color:transparent;
+    -webkit-text-size-adjust:100%; -webkit-tap-highlight-color:transparent;
     overscroll-behavior-y:contain;
-    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+    padding-bottom:calc(74px + env(safe-area-inset-bottom));
   }
   button,a,input,textarea{font:inherit;color:inherit;touch-action:manipulation}
   button{background:none;border:0;padding:0;cursor:pointer}
+  [hidden]{display:none !important}
 
   header.top{
-    position:sticky;top:0;z-index:20;
     background:var(--bg);
-    background:color-mix(in srgb, var(--bg) 88%, transparent);
-    -webkit-backdrop-filter:saturate(180%) blur(14px);
-    backdrop-filter:saturate(180%) blur(14px);
-    padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+    padding:calc(10px + env(safe-area-inset-top)) 16px 8px;
     border-bottom:1px solid var(--line);
     display:flex;align-items:center;gap:10px;
   }
   .h-title{font-weight:700;font-size:20px;letter-spacing:-.02em}
-  .h-sub{color:var(--muted);font-size:13px;margin-top:1px}
+  .h-sub{color:var(--muted);font-size:12.5px;margin-top:1px}
   .h-count{
     margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;
     background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 12px;
     box-shadow:var(--shadow);white-space:nowrap;
   }
-  .iconbtn{
-    width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
-    background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);flex:none;
-  }
-  .iconbtn svg{width:20px;height:20px;display:block}
+  .iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);flex:none}
+  .iconbtn svg{width:20px;height:20px}
 
-  main{padding:12px 14px 8px;max-width:680px;margin:0 auto}
-  .search{
-    display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
-    border-radius:14px;padding:0 12px;box-shadow:var(--shadow);margin-bottom:10px;
+  main{padding:0 14px 8px;max-width:680px;margin:0 auto}
+
+  /* дни */
+  .daychips{
+    position:sticky;top:env(safe-area-inset-top, 0px);z-index:15;
+    display:flex;gap:6px;padding:8px 0;overflow-x:auto;scrollbar-width:none;
+    background:var(--bg);
+    box-shadow:0 8px 12px -10px rgba(0,0,0,.35);
   }
+  .daychips::-webkit-scrollbar{display:none}
+  .day{
+    flex:1 0 auto;min-width:60px;text-align:center;padding:8px 6px;border-radius:12px;
+    border:1px solid var(--line);background:var(--card);color:var(--muted);
+    font-weight:700;font-size:13px;line-height:1.15;box-shadow:var(--shadow);
+  }
+  .day .cnt{display:block;font-size:10.5px;font-weight:600;opacity:.75;margin-top:2px}
+  .day.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+  .day.today:not(.on){border-color:var(--brand);color:var(--brand)}
+
+  .dayhead{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:13px 14px;box-shadow:var(--shadow);margin-bottom:10px}
+  .dayhead .st{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+  .dayhead .task{margin-top:8px;font-size:14px;line-height:1.4;
+    background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:9px 11px;font-weight:600}
+  .bar{height:8px;border-radius:6px;background:var(--gray-bg);overflow:hidden;margin-top:11px;display:flex}
+  .bar i{display:block;height:100%}
+  .bar .o{background:var(--green)} .bar .n{background:var(--red)} .bar .p{background:var(--gray)}
+  .legend{display:flex;gap:12px;margin-top:7px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+  .legend b{font-weight:700;color:var(--ink)}
+
+  .search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:0 12px;box-shadow:var(--shadow);margin:2px 0 8px}
   .search svg{width:18px;height:18px;flex:none;color:var(--muted)}
-  .search input{
-    flex:1;border:0;background:transparent;outline:none;padding:13px 0;font-size:16px;min-width:0;
-  }
+  .search input{flex:1;border:0;background:transparent;outline:none;padding:12px 0;font-size:16px;min-width:0}
 
-  .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
-  .chip{
-    flex:none;border:1px solid var(--line);background:var(--card);color:var(--muted);
-    padding:8px 13px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap;
-  }
+  .chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--muted);
+    padding:7px 12px;border-radius:999px;font-size:13.5px;font-weight:600;white-space:nowrap}
   .chip.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
 
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
-    padding:14px;margin-bottom:10px;box-shadow:var(--shadow);
-  }
-  .card.done{opacity:.72}
+  .zone{margin-bottom:14px}
+  .zone-h{display:flex;align-items:center;gap:8px;margin:14px 2px 8px}
+  .zone-t{font-size:12.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .zone-c{margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .zone-note{font-size:12.5px;color:var(--amber);background:var(--amber-bg);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:12px;margin-bottom:8px;box-shadow:var(--shadow)}
+  .card.s-order{border-left:4px solid var(--green)}
+  .card.s-noorder{border-left:4px solid var(--red)}
+  .card.s-pending{border-left:4px solid var(--gray)}
   .row{display:flex;align-items:center;gap:8px}
-  .name{font-weight:650;font-size:16.5px;letter-spacing:-.01em;min-width:0}
-  .pill{
-    font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;flex:none;
-  }
-  .pill.order{color:var(--green);background:var(--green-bg)}
-  .pill.refusal{color:var(--red);background:var(--red-bg)}
-  .pill.nolpr{color:var(--amber);background:var(--amber-bg)}
-  .pill.none{color:var(--muted);background:color-mix(in srgb,var(--muted) 12%,transparent)}
-  .addr{
-    display:inline-flex;align-items:center;gap:6px;margin-top:7px;text-decoration:none;
-    color:var(--brand);font-size:15px;font-weight:600;line-height:1.3;padding:4px 0;
-  }
-  .addr svg{width:15px;height:15px;flex:none}
-  .addr:active{opacity:.6}
-  .phone{display:block;margin-top:2px;color:var(--muted);font-size:14px;text-decoration:none}
-  .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
-  .btn{
-    border:1px solid var(--line);background:color-mix(in srgb,var(--ink) 3%,transparent);
-    padding:8px 11px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted);
-    display:inline-flex;align-items:center;gap:5px;
-  }
-  .btn:active{transform:scale(.97)}
-  .btn.sel{color:var(--brand-ink);background:var(--brand);border-color:var(--brand)}
-  .btn.order.sel{background:var(--green);border-color:var(--green);color:#fff}
-  .btn.refusal.sel{background:var(--red);border-color:var(--red);color:#fff}
-  .btn.nolpr.sel{background:var(--amber);border-color:var(--amber);color:#231a02}
-  .btn.visited.sel{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
-  .note{
-    width:100%;margin-top:10px;border:1px solid var(--line);background:var(--bg);
-    border-radius:11px;padding:10px 11px;font-size:15px;resize:vertical;min-height:56px;outline:none;
-  }
-  .note:focus{border-color:var(--brand)}
-  .empty{color:var(--muted);text-align:center;padding:36px 20px;font-size:15px}
+  .name{font-weight:650;font-size:16px;letter-spacing:-.01em;min-width:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .pill{font-size:11.5px;font-weight:800;padding:4px 8px;border-radius:999px;white-space:nowrap;flex:none}
+  .pill.o{color:var(--green);background:var(--green-bg)}
+  .pill.n{color:var(--red);background:var(--red-bg)}
+  .pill.p{color:var(--gray);background:var(--gray-bg)}
+  .flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+  .flag{font-size:11px;font-weight:700;padding:3px 7px;border-radius:7px;background:var(--red-bg);color:var(--red)}
+  .flag.ret{background:var(--amber-bg);color:var(--amber)}
+  .flag.call{background:var(--gray-bg);color:var(--ink)}
+  .flag.new{background:var(--green-bg);color:var(--green)}
+  .addr{display:inline-flex;align-items:center;gap:5px;margin-top:7px;text-decoration:none;
+    color:var(--brand);font-size:14px;font-weight:600}
+  .addr svg{width:14px;height:14px}
+  .addr-add{color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}
+  .pay{font-size:13px;color:var(--muted);margin-top:6px}
+  .noteview{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.35}
+  .acts{display:flex;gap:5px;margin-top:10px}
+  .st-btn{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 6px;font-size:12.5px;
+    font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--ink) 3%,transparent)}
+  .st-btn:active{transform:scale(.98)}
+  .st-btn.sel.o{background:var(--green);border-color:var(--green);color:#fff}
+  .st-btn.sel.n{background:var(--red);border-color:var(--red);color:#fff}
+  .st-btn.sel.p{background:var(--gray);border-color:var(--gray);color:#fff}
+  .mini{display:flex;gap:6px;margin-top:8px}
+  .mini .btn{border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;
+    font-weight:600;color:var(--muted);background:color-mix(in srgb,var(--ink) 3%,transparent)}
+  .mini .btn.sel{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+  textarea.note{width:100%;margin-top:8px;border:1px solid var(--line);background:var(--bg);
+    border-radius:10px;padding:9px;font-size:15px;min-height:52px;resize:vertical;outline:none}
+  textarea.note:focus{border-color:var(--brand)}
 
-  /* маршрут */
-  .route-head{display:flex;gap:8px;margin-bottom:12px}
-  .bigbtn{
-    flex:1;background:var(--brand);color:var(--brand-ink);border-radius:14px;padding:14px;
-    font-weight:700;font-size:15.5px;display:flex;align-items:center;justify-content:center;gap:8px;
-    box-shadow:var(--shadow);
-  }
-  .bigbtn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line);flex:none;padding:14px 16px}
-  .bigbtn:disabled{opacity:.45}
-  .rlist{counter-reset:r}
-  .ritem{
-    background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 12px 12px 46px;
-    margin-bottom:8px;position:relative;box-shadow:var(--shadow);
-  }
-  .ritem::before{
-    counter-increment:r;content:counter(r);
-    position:absolute;left:12px;top:12px;width:24px;height:24px;border-radius:50%;
-    background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand);
-    font-size:12.5px;font-weight:800;display:grid;place-items:center;
-  }
-  .ritem.current{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand) inset}
-  .badge-next{
-    font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-    color:var(--brand);margin-bottom:3px;
-  }
-  .rctl{display:flex;gap:6px;margin-top:8px}
-  .rctl .btn{padding:7px 10px;font-size:13px}
+  .empty{color:var(--muted);text-align:center;padding:30px 20px;font-size:14.5px}
 
-  nav.tabs{
-    position:fixed;left:0;right:0;bottom:0;z-index:30;
-    display:flex;gap:8px;padding:8px 14px calc(8px + env(safe-area-inset-bottom));
-    background:var(--bg);
-    background:color-mix(in srgb, var(--bg) 90%, transparent);
-    -webkit-backdrop-filter:saturate(180%) blur(14px);
-    backdrop-filter:saturate(180%) blur(14px);
-    border-top:1px solid var(--line);
-  }
-  .tab{
-    flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;
-    color:var(--muted);font-size:11.5px;font-weight:600;border-radius:12px;
-  }
+  /* календарь */
+  .cal-head{display:flex;align-items:center;gap:10px;margin:12px 0 10px}
+  .cal-title{font-weight:700;font-size:17px}
+  .cal-nav{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--card);
+    display:grid;place-items:center;box-shadow:var(--shadow)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .cal-wd{text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding:4px 0}
+  .cal-cell{aspect-ratio:1/1.05;min-width:0;overflow:hidden;border-radius:10px;border:1px solid transparent;background:var(--card);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px}
+  .cal-cell.weekend{opacity:.35}
+  .cal-cell.today{border-color:var(--brand)}
+  .cal-cell.filled{border-color:var(--line);box-shadow:var(--shadow)}
+  .cal-cell .d{font-weight:700}
+  .cal-cell .s{font-size:9.5px;color:var(--muted);line-height:1.1;text-align:center}
+  .cal-cell .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .cal-cell .dot.part{background:var(--amber)}
+  .cal-cell .dot.none{background:var(--gray)}
+  .cal-cell.empty{border-color:transparent;background:transparent}
+  .cal-sum{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:12px 14px;box-shadow:var(--shadow);font-size:14px;line-height:1.55}
+  .cal-sum b{font-weight:700}
+
+  /* задачи */
+  .task{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);
+    border-radius:13px;padding:12px;margin-bottom:8px;box-shadow:var(--shadow);font-size:15px;line-height:1.4}
+  .box{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);flex:none;display:grid;place-items:center;margin-top:1px}
+  .task.done .box{background:var(--brand);border-color:var(--brand)}
+  .task.done .txt{text-decoration:line-through;color:var(--muted)}
+  .task .box svg{width:15px;height:15px;color:#fff;opacity:0}
+  .task.done .box svg{opacity:1}
+  .sect-t{font-size:12.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--muted);margin:16px 2px 8px}
+
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;gap:8px;
+    padding:8px 14px calc(8px + env(safe-area-inset-bottom));
+    background:var(--bg);border-top:1px solid var(--line)}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;
+    color:var(--muted);font-size:11.5px;font-weight:600;border-radius:12px}
   .tab svg{width:22px;height:22px}
   .tab.on{color:var(--brand);background:color-mix(in srgb,var(--brand) 10%,transparent)}
-  .tab .cnt{position:absolute;transform:translate(16px,-4px);background:var(--brand);color:var(--brand-ink);
-    font-size:10px;font-weight:800;border-radius:999px;padding:1px 5px}
 
   .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
   .sheet-bg.on{opacity:1;pointer-events:auto}
-  .sheet{
-    position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--card);
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--card);
     border-radius:20px 20px 0 0;padding:10px 16px calc(18px + env(safe-area-inset-bottom));
     transform:translateY(102%);transition:transform .22s cubic-bezier(.22,.8,.3,1);
-    box-shadow:0 -10px 40px rgba(0,0,0,.25);
-  }
+    box-shadow:0 -10px 40px rgba(0,0,0,.25);max-height:82vh;overflow:auto}
   .sheet.on{transform:translateY(0)}
-  .sheet .grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 12px}
-  .sheet button.sitem{
-    display:flex;width:100%;align-items:center;gap:12px;padding:14px 6px;font-size:16px;font-weight:600;
-    border-bottom:1px solid var(--line);text-align:left;
-  }
+  .grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 12px}
+  .sheet button.sitem{display:flex;width:100%;align-items:center;gap:12px;padding:14px 6px;font-size:16px;
+    font-weight:600;border-bottom:1px solid var(--line);text-align:left}
   .sheet button.sitem:last-of-type{border-bottom:0}
   .sheet button.sitem.danger{color:var(--red)}
-  .sheet .hint{color:var(--muted);font-size:12.5px;padding:12px 6px 0;line-height:1.45}
-  .toast{
-    position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translate(-50%,14px);
+  .hint{color:var(--muted);font-size:12.5px;padding:12px 6px 0;line-height:1.45}
+  .toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translate(-50%,14px);
     background:#12211a;color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;font-weight:600;
-    opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:88vw;text-align:center;
-  }
+    opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:88vw;text-align:center}
   .toast.on{opacity:1;transform:translate(-50%,0)}
   @media (prefers-color-scheme: dark){ .toast{background:#e8efea;color:#0d1210} }
+  .ditem{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .ditem:last-child{border-bottom:0}
+  .ditem .n{font-weight:600}
 </style>
 </head>
 <body>
@@ -204,7 +221,7 @@
 <header class="top">
   <div>
     <div class="h-title">Точки</div>
-    <div class="h-sub" id="sub">обход за день</div>
+    <div class="h-sub" id="sub">маршрут недели</div>
   </div>
   <div class="h-count" id="count">0 / 0</div>
   <button class="iconbtn" id="menuBtn" aria-label="Меню">
@@ -213,295 +230,458 @@
 </header>
 
 <main>
-  <section id="view-all">
+  <section id="view-day">
+    <div class="daychips" id="daychips"></div>
+    <div class="dayhead" id="dayhead"></div>
     <div class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="q" type="search" placeholder="Название или адрес" autocomplete="off" enterkeyhint="search">
+      <input id="q" type="search" placeholder="Найти точку" autocomplete="off" enterkeyhint="search">
     </div>
     <div class="chips" id="chips">
       <button class="chip on" data-f="all">Все</button>
-      <button class="chip" data-f="todo">Не обойдено</button>
-      <button class="chip" data-f="order">Заказ</button>
-      <button class="chip" data-f="refusal">Отказ</button>
-      <button class="chip" data-f="nolpr">Нет ЛПР</button>
+      <button class="chip" data-f="pending">⬜ Не были</button>
+      <button class="chip" data-f="order">🟢 Заказали</button>
+      <button class="chip" data-f="noorder">🔴 Не заказали</button>
+      <button class="chip" data-f="flags">⚠️ Долги и возвраты</button>
     </div>
-    <div id="list"></div>
+    <div id="zones"></div>
   </section>
 
-  <section id="view-route" hidden>
-    <div class="route-head">
-      <button class="bigbtn" id="openRoute">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 7v13M15 4v13"/></svg>
-        Открыть маршрут
-      </button>
-      <button class="bigbtn ghost" id="addTodo" title="Добавить все не обойдённые">＋</button>
+  <section id="view-cal" hidden>
+    <div class="cal-head">
+      <button class="cal-nav" id="calPrev">‹</button>
+      <div class="cal-title" id="calTitle">—</div>
+      <button class="cal-nav" id="calNext" style="margin-left:auto">›</button>
     </div>
-    <div id="routeList" class="rlist"></div>
-    <div id="routeEmpty" class="empty">Маршрут пуст.<br>В списке точек нажми «В маршрут» —<br>порядок обхода можно менять.</div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-sum" id="calSum"></div>
+  </section>
+
+  <section id="view-tasks" hidden>
+    <div class="sect-t">Чек-лист недели</div>
+    <div id="checkList"></div>
+    <div class="sect-t">Задачи по дням</div>
+    <div id="dayTasks"></div>
   </section>
 </main>
 
 <nav class="tabs">
-  <button class="tab on" data-tab="all">
+  <button class="tab on" data-tab="day">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-    Точки
+    День
   </button>
-  <button class="tab" data-tab="route">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18V8a4 4 0 014-4h2"/><path d="M17 21l3-3-3-3"/><path d="M20 18H9a5 5 0 01-5-5V8"/></svg>
-    Маршрут
+  <button class="tab" data-tab="cal">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+    Календарь
+  </button>
+  <button class="tab" data-tab="tasks">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Задачи
   </button>
 </nav>
 
 <div class="sheet-bg" id="sheetBg"></div>
 <div class="sheet" id="sheet">
   <div class="grab"></div>
+  <button class="sitem" data-menu="save">📅 Сохранить день</button>
   <button class="sitem" data-menu="export">⬇︎ Сохранить копию данных</button>
   <button class="sitem" data-menu="import">⬆︎ Загрузить данные из файла</button>
-  <button class="sitem danger" data-menu="reset">↺ Сбросить отметки</button>
-  <div class="hint">Копия сохраняется в «Файлы» на iPhone. Если данные пропадут после чистки Safari — загрузите копию отсюда.</div>
+  <button class="sitem danger" data-menu="reset">↺ Сбросить все статусы</button>
+  <div class="hint">День сохраняется автоматически при каждой отметке — «Сохранить день» нужна, чтобы зафиксировать вручную. Копия данных сохраняется в «Файлы».</div>
   <input type="file" id="fileIn" accept=".json,application/json" hidden>
+</div>
+
+<div class="sheet-bg" id="dateBg"></div>
+<div class="sheet" id="dateSheet">
+  <div class="grab"></div>
+  <div style="font-weight:700;font-size:17px;padding:0 6px 10px" id="dateTitle">—</div>
+  <div id="dateBody"></div>
 </div>
 
 <div class="toast" id="toast"></div>
 
+<script src="data.js"></script>
 <script>
 "use strict";
-const KEY = "tochki_v1";
-const RESULT = {
-  order:   {label:"Заказ",     cls:"order"},
-  refusal: {label:"Отказ",     cls:"refusal"},
-  nolpr:   {label:"Нет ЛПР",   cls:"nolpr"},
+const KEY = "tochki_v2";
+const DAYS = window.WEEK.days;
+const DAY_INDEX = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4 };
+const ST = {
+  order:   { label: "Заказали",    short: "🟢", cls: "o" },
+  noorder: { label: "Не заказали", short: "🔴", cls: "n" },
+  pending: { label: "Не были",     short: "⬜", cls: "p" },
+};
+const FLAG = {
+  debt: { label: "Долг",     cls: "" },
+  ret:  { label: "Возврат",  cls: "ret" },
+  call: { label: "Позвонить", cls: "call" },
+  new:  { label: "Новая",    cls: "new" },
+  ask:  { label: "Уточнить",  cls: "call" },
 };
 
-/* demo-данные: заменяются реальным списком точек */
-const SEED = {
-  points: [
-    {id:"p1",  name:"Магнит «Центральный»",  address:"Москва, ул. Тверская, 12",          phone:"",                  note:""},
-    {id:"p2",  name:"Пятёрочка",             address:"Москва, ул. Тверская, 25",          phone:"",                  note:""},
-    {id:"p3",  name:"Перекрёсток",           address:"Москва, Малая Дмитровка, 3",        phone:"",                  note:""},
-    {id:"p4",  name:"Дикси",                 address:"Москва, Пушкинская пл., 1",         phone:"",                  note:""},
-    {id:"p5",  name:"ВкусВилл",              address:"Москва, Страстной б-р, 5",          phone:"",                  note:""},
-    {id:"p6",  name:"Аптека «Здоровье»",     address:"Москва, Петровка, 19",              phone:"",                  note:""},
-    {id:"p7",  name:"Магнит",                address:"Москва, Кузнецкий Мост, 9",         phone:"",                  note:""},
-    {id:"p8",  name:"Пятёрочка",             address:"Москва, Рождественка, 6",           phone:"",                  note:""},
-    {id:"p9",  name:"Лента",                 address:"Москва, Рождественка, 20/8",        phone:"",                  note:""},
-    {id:"p10", name:"Перекрёсток",           address:"Москва, Никольская, 10",            phone:"",                  note:""},
-  ],
-  route: [],
-};
-
-let state = load();
-let filter = "all", query = "";
-let activeTab = "all";
-const openNotes = new Set();
-
-function normalize(p){
-  return {
-    id: p.id || "p" + Math.random().toString(36).slice(2, 9),
-    name: p.name || "Без названия",
-    address: p.address || "",
-    phone: p.phone || "",
-    note: p.note || "",
-    visited: !!p.visited,
-    result: p.result && RESULT[p.result] ? p.result : null,
-  };
+/* ---------- состояние ---------- */
+function todayKey(){
+  const wd = new Date().getDay(); // 0 вс
+  return ["sun","mon","tue","wed","thu","fri","sat"][wd];
 }
 function load(){
-  try{
-    const raw = localStorage.getItem(KEY);
-    if(!raw) return normalizeState(JSON.parse(JSON.stringify(SEED)));
-    return normalizeState(JSON.parse(raw));
-  }catch(e){ return normalizeState(JSON.parse(JSON.stringify(SEED))); }
+  let s = null;
+  try{ s = JSON.parse(localStorage.getItem(KEY) || "null"); }catch(e){}
+  if(!s || typeof s !== "object") s = {};
+  return {
+    status: s.status || {},
+    notes: s.notes || {},
+    addrs: s.addrs || {},
+    checks: s.checks || {},
+    history: s.history || {},
+    day: s.day && DAY_INDEX[s.day] !== undefined ? s.day : (DAY_INDEX[todayKey()] !== undefined ? todayKey() : "mon"),
+  };
 }
-function normalizeState(s){
-  const points = (s.points || []).map(normalize);
-  const ids = new Set(points.map(p => p.id));
-  const route = (s.route || []).filter(id => ids.has(id));
-  return {points, route};
-}
+let state = load();
+let ui = { filter: "all", query: "", openNotes: new Set() };
+
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }
-  catch(e){ toast("Не удалось сохранить — память браузера недоступна"); }
+  catch(e){ toast("Память браузера недоступна — сделайте копию данных"); }
+}
+const statusOf = p => state.status[p.id] || p.st || "pending";
+const noteOf   = p => state.notes[p.id] !== undefined ? state.notes[p.id] : (p.t || "");
+const addrOf   = p => state.addrs[p.id] || p.a || "";
+const dayObj   = key => DAYS.find(d => d.key === key) || DAYS[0];
+const pointsOf = key => dayObj(key).zones.flatMap(z => z.points);
+function countsOf(key){
+  const c = { order: 0, noorder: 0, pending: 0, total: 0 };
+  pointsOf(key).forEach(p => { c[statusOf(p)]++; c.total++; });
+  return c;
 }
 
+/* ---------- даты ---------- */
+const pad = n => String(n).padStart(2, "0");
+const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+function mondayOf(d){
+  const x = new Date(d); const wd = (x.getDay() + 6) % 7;
+  x.setDate(x.getDate() - wd); x.setHours(0,0,0,0); return x;
+}
+function dateForDay(key){
+  const m = mondayOf(new Date()); const d = new Date(m);
+  d.setDate(m.getDate() + DAY_INDEX[key]); return d;
+}
+function snapshot(key){
+  const date = dateForDay(key), s = iso(date), c = countsOf(key);
+  state.history[s] = {
+    day: key, at: Date.now(), counts: c,
+    items: pointsOf(key).map(p => ({ id: p.id, n: p.n, s: statusOf(p), note: noteOf(p) })),
+  };
+  save();
+}
+const MONTHS = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+
+/* ---------- утилиты ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const mapsUrl = addr => "https://yandex.ru/maps/?text=" + encodeURIComponent(addr);
+const mapsUrl = a => "https://yandex.ru/maps/?text=" + encodeURIComponent(a);
 function openExternal(url){
   const a = document.createElement("a");
   a.href = url; a.target = "_blank"; a.rel = "noopener";
   document.body.appendChild(a); a.click(); a.remove();
 }
-const routeUrl = addrs => addrs.length
-  ? "https://yandex.ru/maps/?rtt=auto&rtext=" + addrs.map(encodeURIComponent).join("~")
-  : "";
-
+let toastTimer;
 function toast(msg){
   const t = $("#toast"); t.textContent = msg; t.classList.add("on");
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 2200);
-}
-function pointById(id){ return state.points.find(p => p.id === id); }
-
-function visiblePoints(){
-  let arr = state.points.slice();
-  if(query){
-    const q = query.toLowerCase().trim();
-    arr = arr.filter(p => (p.name + " " + p.address).toLowerCase().includes(q));
-  }
-  if(filter === "todo") arr = arr.filter(p => !p.visited);
-  if(filter !== "all" && filter !== "todo") arr = arr.filter(p => p.result === filter);
-  return arr;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), 2200);
 }
 
-function cardHtml(p){
-  const inRoute = state.route.includes(p.id);
-  const res = p.result ? RESULT[p.result] : null;
-  return `<article class="card ${p.visited ? "done" : ""}" data-id="${p.id}">
+/* ---------- день ---------- */
+function renderDayChips(){
+  const today = todayKey();
+  $("#daychips").innerHTML = DAYS.map(d => {
+    const c = countsOf(d.key);
+    const done = c.order + c.noorder;
+    return `<button class="day ${state.day === d.key ? "on" : ""} ${today === d.key ? "today" : ""}" data-day="${d.key}">
+      ${d.short}<span class="cnt">${done}/${c.total}</span></button>`;
+  }).join("");
+}
+
+function renderDayHead(){
+  const d = dayObj(state.day), c = countsOf(state.day);
+  const pct = n => c.total ? (n / c.total * 100) : 0;
+  const withAddr = pointsOf(state.day).filter(p => addrOf(p)).length;
+  $("#dayhead").innerHTML = `
     <div class="row">
-      <div class="name">${esc(p.name)}</div>
-      <span class="pill ${res ? res.cls : "none"}" style="margin-left:auto">${res ? res.label : "Не обойдено"}</span>
+      <div class="name">${esc(d.title)}</div>
+      ${d.start && d.start !== "—" ? `<span class="pill p" style="margin-left:auto">старт: ${esc(d.start)}</span>` : ""}
     </div>
-    ${p.address ? `<a class="addr" href="${mapsUrl(p.address)}" target="_blank" rel="noopener">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.1 7-11a7 7 0 10-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
-      ${esc(p.address)}
-    </a>` : ""}
-    ${p.phone ? `<a class="phone" href="tel:${esc(p.phone)}">${esc(p.phone)}</a>` : ""}
+    ${d.task ? `<div class="task">${esc(d.task)}</div>` : ""}
+    <div class="bar" style="margin-top:12px">
+      <i class="o" style="width:${pct(c.order)}%"></i><i class="n" style="width:${pct(c.noorder)}%"></i><i class="p" style="width:${pct(c.pending)}%"></i>
+    </div>
+    <div class="legend">
+      <span>🟢 <b>${c.order}</b></span><span>🔴 <b>${c.noorder}</b></span><span>⬜ <b>${c.pending}</b></span>
+      <span style="margin-left:auto">всего <b>${c.total}</b></span>
+    </div>
+    ${withAddr >= 2 ? `<div class="mini"><button class="btn" id="dayRoute">🗺 Маршрут по адресам (${withAddr})</button></div>` : ""}
+  `;
+  const rb = $("#dayRoute");
+  if(rb) rb.addEventListener("click", () => {
+    const addrs = pointsOf(state.day).filter(p => addrOf(p)).map(p => addrOf(p));
+    openExternal("https://yandex.ru/maps/?rtt=auto&rtext=" + addrs.map(encodeURIComponent).join("~"));
+  });
+}
+
+function pointCard(p){
+  const st = statusOf(p), a = addrOf(p), note = noteOf(p), open = ui.openNotes.has(p.id);
+  const flags = (p.f || []).map(f => FLAG[f] ? `<span class="flag ${FLAG[f].cls}">${FLAG[f].label}</span>` : "").join("");
+  return `<article class="card s-${st}" data-id="${p.id}">
+    <div class="row">
+      <div style="min-width:0"><div class="name">${esc(p.n)}</div>
+      ${p.s ? `<div class="sub">${esc(p.s)}</div>` : ""}</div>
+      <span class="pill ${ST[st].cls}" style="margin-left:auto">${ST[st].short} ${ST[st].label}</span>
+    </div>
+    ${flags ? `<div class="flags">${flags}</div>` : ""}
+    ${p.pay ? `<div class="pay">${esc(p.pay)}</div>` : ""}
+    <div class="row" style="margin-top:2px;gap:10px;flex-wrap:wrap">
+      ${a
+        ? `<a class="addr" href="${mapsUrl(a)}" target="_blank" rel="noopener">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.1 7-11a7 7 0 10-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+             ${esc(a)}</a>
+           <button class="addr-add" data-act="addr" title="Изменить адрес">✎</button>`
+        : `<button class="addr-add" data-act="addr">＋ адрес</button>`}
+    </div>
+    ${note && !open ? `<div class="noteview">📝 ${esc(note)}</div>` : ""}
+    ${open ? `<textarea class="note" data-note placeholder="Что сказали, что привезти…">${esc(note)}</textarea>` : ""}
     <div class="acts">
-      <button class="btn visited ${p.visited ? "sel" : ""}" data-act="visited">${p.visited ? "✓ Обойдено" : "○ Обойти"}</button>
-      <button class="btn order ${p.result === "order" ? "sel" : ""}" data-act="order">Заказ</button>
-      <button class="btn refusal ${p.result === "refusal" ? "sel" : ""}" data-act="refusal">Отказ</button>
-      <button class="btn nolpr ${p.result === "nolpr" ? "sel" : ""}" data-act="nolpr">Нет ЛПР</button>
-      <button class="btn ${inRoute ? "sel" : ""}" data-act="route">${inRoute ? "✓ В маршруте" : "＋ В маршрут"}</button>
-      <button class="btn ${openNotes.has(p.id) ? "sel" : ""}" data-act="note">Заметка</button>
+      <button class="st-btn o ${st === "order" ? "sel" : ""}" data-act="order">🟢 Заказали</button>
+      <button class="st-btn n ${st === "noorder" ? "sel" : ""}" data-act="noorder">🔴 Не заказали</button>
+      <button class="st-btn p ${st === "pending" ? "sel" : ""}" data-act="pending">⬜ Не были</button>
     </div>
-    <textarea class="note" data-note placeholder="Что сказали, что привезти, кому звонить…" ${openNotes.has(p.id) ? "" : "hidden"}>${esc(p.note)}</textarea>
+    <div class="mini">
+      <button class="btn ${open ? "sel" : ""}" data-act="note">📝 Заметка</button>
+      ${p.f && p.f.includes("call") ? `<button class="btn" data-act="call">📞 Позвонить</button>` : ""}
+    </div>
   </article>`;
 }
 
-function renderList(){
-  const arr = visiblePoints();
-  $("#list").innerHTML = arr.length ? arr.map(cardHtml).join("")
-    : `<div class="empty">Ничего не найдено.<br>Попробуй другой фильтр или запрос.</div>`;
-}
-
-function renderRoute(){
-  const items = state.route.map(pointById).filter(Boolean);
-  $("#routeEmpty").hidden = items.length > 0;
-  $("#routeList").hidden = items.length === 0;
-  const nextIdx = items.findIndex(p => !p.visited);
-  $("#routeList").innerHTML = items.map((p, i) => {
-    const res = p.result ? RESULT[p.result] : null;
-    return `<div class="ritem ${i === nextIdx ? "current" : ""}" data-id="${p.id}">
-      ${i === nextIdx ? `<div class="badge-next">Следующая</div>` : ""}
-      <div class="row"><div class="name">${esc(p.name)}</div>
-        <span class="pill ${res ? res.cls : "none"}" style="margin-left:auto">${res ? res.label : (p.visited ? "Обойдено" : "Ожидает")}</span></div>
-      <a class="addr" href="${mapsUrl(p.address)}" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.1 7-11a7 7 0 10-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
-        ${esc(p.address)}</a>
-      <div class="rctl">
-        <button class="btn" data-r="up" ${i === 0 ? "disabled" : ""}>▲</button>
-        <button class="btn" data-r="down" ${i === items.length - 1 ? "disabled" : ""}>▼</button>
-        <button class="btn" data-r="next">Перейти</button>
-        <button class="btn" data-r="rm" style="margin-left:auto">✕</button>
-      </div>
+function renderZones(){
+  const d = dayObj(state.day);
+  const q = ui.query.toLowerCase().trim();
+  let html = "";
+  let shown = 0;
+  d.zones.forEach(z => {
+    let pts = z.points.filter(p => {
+      if(q && !(p.n + " " + (p.s || "") + " " + (p.a || "")).toLowerCase().includes(q)) return false;
+      const st = statusOf(p);
+      if(ui.filter === "flags") return (p.f || []).length > 0 || /долг|возврат/i.test(noteOf(p));
+      if(ui.filter !== "all" && st !== ui.filter) return false;
+      return true;
+    });
+    if(!pts.length) return;
+    shown += pts.length;
+    html += `<div class="zone">
+      <div class="zone-h"><div class="zone-t">${esc(z.title)}</div>
+        <div class="zone-c">${z.points.filter(p => statusOf(p) === "order").length}/${z.points.length} 🟢</div></div>
+      ${z.note ? `<div class="zone-note">${esc(z.note)}</div>` : ""}
+      ${pts.map(pointCard).join("")}
     </div>`;
-  }).join("");
-  const visitedInRoute = items.filter(p => p.visited).length;
-  $("#sub").textContent = items.length ? `в маршруте ${items.length} · обойдено ${visitedInRoute}` : "обход за день";
-  $("#openRoute").disabled = items.length === 0;
+  });
+  $("#zones").innerHTML = shown ? html : `<div class="empty">Ничего не найдено.<br>Попробуйте другой фильтр.</div>`;
 }
 
 function renderCounts(){
-  const total = state.points.length;
-  const done = state.points.filter(p => p.visited).length;
-  $("#count").textContent = done + " / " + total;
+  const c = countsOf(state.day);
+  $("#count").textContent = (c.order + c.noorder) + " / " + c.total;
+  $("#sub").textContent = dayObj(state.day).title.toLowerCase();
 }
 
-function render(){
-  renderList(); renderRoute(); renderCounts();
+function renderDay(){
+  renderDayChips(); renderDayHead(); renderZones(); renderCounts();
 }
 
-/* ---------- действия ---------- */
-function setResult(id, res){
-  const p = pointById(id); if(!p) return;
-  p.result = (p.result === res) ? null : res;
-  if(p.result) p.visited = true;
-  save(); render();
-}
-function toggleVisited(id){
-  const p = pointById(id); if(!p) return;
-  p.visited = !p.visited;
-  if(!p.visited && p.result) p.result = null;
-  save(); render();
-}
-function toggleRoute(id){
-  const i = state.route.indexOf(id);
-  if(i >= 0) state.route.splice(i, 1); else state.route.push(id);
-  save(); render();
+/* ---------- календарь ---------- */
+let calCursor = new Date();
+calCursor.setDate(1);
+
+function dayCountsForDate(date){
+  const diff = Math.round((date - mondayOf(new Date())) / 86400000);
+  if(diff >= 0 && diff <= 4) return countsOf(["mon","tue","wed","thu","fri"][diff]);
+  const h = state.history[iso(date)];
+  return h ? h.counts : null;
 }
 
-function onListAction(act, id){
-  if(act === "visited") return toggleVisited(id);
-  if(act === "route")   return toggleRoute(id);
-  if(act === "note"){
-    if(openNotes.has(id)) openNotes.delete(id); else openNotes.add(id);
-    return renderList();
+function renderCal(){
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  $("#calTitle").textContent = MONTHS[m] + " " + y;
+  const first = new Date(y, m, 1);
+  const startPad = (first.getDay() + 6) % 7;
+  const daysIn = new Date(y, m + 1, 0).getDate();
+  const today = iso(new Date());
+  const weekMonday = mondayOf(new Date());
+  let cells = "";
+  ["пн","вт","ср","чт","пт","сб","вс"].forEach(w => cells += `<div class="cal-wd">${w}</div>`);
+  for(let i = 0; i < startPad; i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let dd = 1; dd <= daysIn; dd++){
+    const date = new Date(y, m, dd), key = iso(date);
+    const wd = (date.getDay() + 6) % 7;
+    const c = dayCountsForDate(date);
+    let inner = `<div class="d">${dd}</div>`;
+    if(c && c.total){
+      const done = c.order + c.noorder;
+      const allOrders = c.order === c.total;
+      inner += `<div class="s">${c.order}/${c.total}</div><div class="dot ${allOrders ? "" : (done > 0 ? "part" : "none")}"></div>`;
+    }
+    cells += `<button class="cal-cell ${wd > 4 ? "weekend" : ""} ${key === today ? "today" : ""} ${c ? "filled" : ""}" data-date="${key}">${inner}</button>`;
   }
-  if(RESULT[act]) return setResult(id, act);
+  // добиваем до 7
+  const total = startPad + daysIn;
+  for(let i = total; i % 7 !== 0; i++) cells += `<div class="cal-cell empty"></div>`;
+  $("#calGrid").innerHTML = cells;
+
+  let days = 0, orders = 0, pt = 0;
+  for(let dd = 1; dd <= daysIn; dd++){
+    const c = dayCountsForDate(new Date(y, m, dd));
+    if(c){ days++; orders += c.order; pt += c.total; }
+  }
+  const withAddr = DAYS.flatMap(d => d.zones.flatMap(z => z.points)).filter(p => addrOf(p)).length;
+  $("#calSum").innerHTML = `
+    <div><b>${days}</b> дн. с маршрутом · заказов: <b>${orders}</b> · точек в маршруте: <b>${pt}</b></div>
+    <div style="color:var(--muted);font-size:12.5px;margin-top:6px">
+      Сегодня сохраняется автоматически при каждой отметке.
+      Адреса указаны у ${withAddr} точек — добавьте остальные кнопкой «＋ адрес», и появится маршрут по картам.
+    </div>`;
 }
 
-/* ---------- обработчики ---------- */
-$("#list").addEventListener("click", e => {
-  const btn = e.target.closest("[data-act]");
-  if(!btn) return;
-  const card = e.target.closest("[data-id]");
-  onListAction(btn.dataset.act, card.dataset.id);
+function openDate(key){
+  const date = new Date(key + "T00:00:00");
+  const diff = Math.round((date - mondayOf(new Date())) / 86400000);
+  let h = null, live = false;
+  if(diff >= 0 && diff <= 4){
+    const dk = ["mon","tue","wed","thu","fri"][diff];
+    h = { counts: countsOf(dk), items: pointsOf(dk).map(p => ({ n: p.n, s: statusOf(p), note: noteOf(p) })) };
+    live = true;
+  } else h = state.history[key];
+  const title = date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" }) + (live ? " · сейчас" : "");
+  $("#dateTitle").textContent = title;
+  if(!h){ $("#dateBody").innerHTML = `<div class="hint">За этот день записей нет.</div>`; }
+  else {
+    const c = h.counts;
+    const groups = [["order","🟢 Заказали"],["noorder","🔴 Не заказали"],["pending","⬜ Не были"]];
+    $("#dateBody").innerHTML = `
+      <div class="hint" style="padding:0 6px 10px">Заказов: <b>${c.order}</b> · без заказа: <b>${c.noorder}</b> · не были: <b>${c.pending}</b></div>
+      ${groups.map(([k, label]) => {
+        const items = h.items.filter(i => i.s === k);
+        if(!items.length) return "";
+        return `<div class="sect-t">${label} · ${items.length}</div>` +
+          items.map(i => `<div class="ditem"><span class="n">${esc(i.n)}</span>
+            ${i.note ? `<span style="color:var(--muted);font-size:12.5px">${esc(i.note)}</span>` : ""}</div>`).join("");
+      }).join("")}`;
+  }
+  $("#dateSheet").classList.add("on"); $("#dateBg").classList.add("on");
+}
+
+/* ---------- задачи ---------- */
+function renderTasks(){
+  $("#checkList").innerHTML = window.WEEK.check.map(t => `
+    <div class="task ${state.checks[t.id] ? "done" : ""}" data-check="${t.id}">
+      <div class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>
+      <div class="txt">${esc(t.text)}</div>
+    </div>`).join("");
+  $("#dayTasks").innerHTML = DAYS.filter(d => d.task).map(d => `
+    <div class="task" style="border-left:3px solid var(--brand)">
+      <div class="box" style="border-radius:50%;border-color:var(--line)"></div>
+      <div class="txt"><b>${esc(d.title)}</b><br>${esc(d.task)}</div>
+    </div>`).join("") || `<div class="empty">Задач по дням нет.</div>`;
+}
+
+/* ---------- действия с точкой ---------- */
+function findPoint(id){
+  for(const d of DAYS) for(const z of d.zones) for(const p of z.points) if(p.id === id) return p;
+  return null;
+}
+function setStatus(id, st){
+  const p = findPoint(id); if(!p) return;
+  state.status[id] = state.status[id] === st ? "pending" : st;
+  if(state.status[id] === (p.st || "pending") && !state.status[id]) delete state.status[id];
+  save(); snapshot(state.day); renderDay();
+}
+function toggleNote(id){
+  ui.openNotes.has(id) ? ui.openNotes.delete(id) : ui.openNotes.add(id);
+  renderZones();
+}
+function editAddr(id){
+  const p = findPoint(id); if(!p) return;
+  const cur = addrOf(p);
+  const v = prompt("Адрес точки (город, улица, дом):", cur);
+  if(v === null) return;
+  const t = v.trim();
+  if(t) state.addrs[id] = t; else delete state.addrs[id];
+  save(); renderZones();
+}
+
+/* ---------- обработчики UI ---------- */
+$("#daychips").addEventListener("click", e => {
+  const b = e.target.closest("[data-day]"); if(!b) return;
+  snapshot(state.day);
+  state.day = b.dataset.day; save();
+  ui.openNotes.clear(); renderDay();
 });
-$("#list").addEventListener("input", e => {
+
+let noteTimer;
+$("#zones").addEventListener("click", e => {
+  const act = e.target.closest("[data-act]");
+  const card = e.target.closest("[data-id]");
+  if(!card) return;
+  const id = card.dataset.id;
+  if(!act) return;
+  const a = act.dataset.act;
+  if(a === "order" || a === "noorder" || a === "pending") return setStatus(id, a);
+  if(a === "note") return toggleNote(id);
+  if(a === "addr") return editAddr(id);
+  if(a === "call"){
+    const p = findPoint(id);
+    const digits = (p && p.phone) || "";
+    if(digits) openExternal("tel:" + digits);
+    else toast("Телефон не указан — добавим позже");
+  }
+});
+$("#zones").addEventListener("input", e => {
   const ta = e.target.closest("[data-note]");
   if(!ta) return;
-  const p = pointById(e.target.closest("[data-id]").dataset.id);
-  p.note = ta.value; save();
-  clearTimeout(ta._t); ta._t = setTimeout(() => {}, 200);
+  const id = e.target.closest("[data-id]").dataset.id;
+  state.notes[id] = ta.value;
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => { snapshot(state.day); save(); }, 400);
 });
 
-$("#routeList").addEventListener("click", e => {
-  const item = e.target.closest("[data-id]"); if(!item) return;
-  const id = item.dataset.id;
-  const btn = e.target.closest("[data-r]");
-  if(!btn) return;
-  const i = state.route.indexOf(id);
-  const op = btn.dataset.r;
-  if(op === "rm") state.route.splice(i, 1);
-  if(op === "up" && i > 0){ state.route.splice(i,1); state.route.splice(i-1,0,id); }
-  if(op === "down" && i < state.route.length-1){ state.route.splice(i,1); state.route.splice(i+1,0,id); }
-  if(op === "next"){ openExternal("https://yandex.ru/maps/?rtt=auto&rtext=~" + encodeURIComponent(pointById(id).address)); return; }
-  save(); render();
-});
-
-$("#q").addEventListener("input", e => { query = e.target.value; renderList(); });
+$("#q").addEventListener("input", e => { ui.query = e.target.value; renderZones(); });
 $("#chips").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if(!c) return;
-  document.querySelectorAll(".chip").forEach(x => x.classList.toggle("on", x === c));
-  filter = c.dataset.f; renderList();
+  document.querySelectorAll("#chips .chip").forEach(x => x.classList.toggle("on", x === c));
+  ui.filter = c.dataset.f; renderZones();
 });
+
 document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
-  activeTab = t.dataset.tab;
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
-  $("#view-all").hidden = activeTab !== "all";
-  $("#view-route").hidden = activeTab !== "route";
-  window.scrollTo({top:0});
+  const v = t.dataset.tab;
+  $("#view-day").hidden = v !== "day";
+  $("#view-cal").hidden = v !== "cal";
+  $("#view-tasks").hidden = v !== "tasks";
+  if(v === "cal") renderCal();
+  if(v === "tasks") renderTasks();
+  requestAnimationFrame(() => window.scrollTo(0, 0));
 }));
 
-$("#openRoute").addEventListener("click", () => {
-  const addrs = state.route.map(pointById).filter(p => p && p.address).map(p => p.address);
-  if(!addrs.length) return;
-  openExternal(routeUrl(addrs));
+$("#calPrev").addEventListener("click", () => { calCursor.setMonth(calCursor.getMonth() - 1); renderCal(); });
+$("#calNext").addEventListener("click", () => { calCursor.setMonth(calCursor.getMonth() + 1); renderCal(); });
+$("#calGrid").addEventListener("click", e => {
+  const c = e.target.closest("[data-date]"); if(!c) return;
+  openDate(c.dataset.date);
 });
-$("#addTodo").addEventListener("click", () => {
-  const add = state.points.filter(p => !p.visited && !state.route.includes(p.id)).map(p => p.id);
-  if(!add.length) return toast("Все не обойдённые уже в маршруте");
-  state.route.push(...add); save(); render(); toast("Добавлено точек: " + add.length);
+$("#dateBg").addEventListener("click", () => { $("#dateSheet").classList.remove("on"); $("#dateBg").classList.remove("on"); });
+
+$("#checkList").addEventListener("click", e => {
+  const t = e.target.closest("[data-check]"); if(!t) return;
+  const id = t.dataset.check;
+  state.checks[id] = !state.checks[id];
+  save(); renderTasks();
 });
 
 /* меню */
@@ -509,26 +689,25 @@ const sheet = $("#sheet"), sheetBg = $("#sheetBg");
 function openSheet(v){ sheet.classList.toggle("on", v); sheetBg.classList.toggle("on", v); }
 $("#menuBtn").addEventListener("click", () => openSheet(true));
 sheetBg.addEventListener("click", () => openSheet(false));
-
 sheet.addEventListener("click", e => {
   const b = e.target.closest("[data-menu]"); if(!b) return;
   const what = b.dataset.menu;
   openSheet(false);
+  if(what === "save"){ snapshot(state.day); toast("День сохранён"); }
   if(what === "export") exportJson();
   if(what === "import") $("#fileIn").click();
   if(what === "reset"){
-    if(!confirm("Сбросить все отметки («обойдено» и результат)? Заметки останутся.")) return;
-    state.points.forEach(p => { p.visited = false; p.result = null; });
-    save(); render(); toast("Отметки сброшены");
+    if(!confirm("Сбросить все статусы точек (🟢/🔴/⬜)? Заметки и адреса останутся.")) return;
+    state.status = {}; save(); snapshot(state.day); renderDay(); toast("Статусы сброшены");
   }
 });
 
 function exportJson(){
-  const data = JSON.stringify({app:"tochki", version:1, exportedAt:new Date().toISOString(), ...state}, null, 2);
-  const blob = new Blob([data], {type:"application/json"});
+  const data = JSON.stringify({ app: "tochki", version: 2, at: new Date().toISOString(), state }, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "tochki-" + new Date().toISOString().slice(0,10) + ".json";
+  a.download = "tochki-" + iso(new Date()) + ".json";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1500);
   toast("Копия сохранена в «Файлы»");
@@ -538,17 +717,30 @@ $("#fileIn").addEventListener("change", e => {
   const r = new FileReader();
   r.onload = () => {
     try{
-      const s = JSON.parse(r.result);
-      if(!Array.isArray(s.points)) throw new Error("нет списка points");
-      state = normalizeState(s);
-      save(); render(); toast("Загружено точек: " + state.points.length);
+      const obj = JSON.parse(r.result);
+      const s = obj.state || obj;
+      if(!s || typeof s !== "object" || !s.status) throw new Error("не тот формат");
+      state = { status: s.status || {}, notes: s.notes || {}, addrs: s.addrs || {},
+                checks: s.checks || {}, history: s.history || {}, day: state.day };
+      save(); renderDay(); toast("Данные загружены");
     }catch(err){ toast("Не получилось прочитать файл"); }
   };
   r.readAsText(f);
   e.target.value = "";
 });
 
-render();
+/* старт */
+renderDay();
+(function startTab(){
+  const t = new URLSearchParams(location.search).get("tab");
+  if(t === "cal" || t === "tasks"){
+    const btn = document.querySelector('.tab[data-tab="' + t + '"]');
+    if(btn) btn.click();
+  }
+})();
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "hidden") snapshot(state.day);
+});
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
