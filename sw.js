@@ -1,6 +1,6 @@
 /* Офлайн-режим: приложение стартует из кэша мгновенно и без сети.
    Версия кэша обновляется автоматически при публикации (publish.mjs). */
-const CACHE = "tochki-4653adaabf";
+const CACHE = "tochki-a22f57e8ad";
 const ASSETS = [
   "./",
   "./index.html",
