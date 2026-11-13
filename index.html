@@ -623,7 +623,6 @@ function renderDayHead(){
       <div class="name">${esc(d.title)}</div>
       <span class="pill p" style="margin-left:auto">неделя ${weekLabel()}</span>
     </div>
-    ${d.start && d.start !== "—" ? `<div class="startline">🚗 старт: ${esc(d.start)}</div>` : ""}
     <button class="taskline ${task ? "" : "empty-task"}" data-act="editTask">
       ${task ? esc(task) : "＋ добавить важную заметку на этот день"}
       <span class="taskedit">✎</span>
