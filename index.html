@@ -134,6 +134,11 @@
   .ca{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cp{font-size:11px;font-weight:800;flex:none}
   .cp.o{color:var(--green)} .cp.n{color:var(--red)} .cp.p{color:var(--muted)}
+  .field{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 6px 0}
+  .field input{display:block;width:100%;margin-top:5px;font-size:16px;padding:11px 12px;
+    border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);outline:none}
+  .field input:focus{border-color:var(--brand)}
+  .tapname{cursor:pointer}
   .xdel{width:26px;height:26px;border-radius:8px;background:var(--red-bg);color:var(--red);
     font-size:13px;flex:none;display:grid;place-items:center;margin-left:6px}
   .startline{font-size:13px;color:var(--muted);margin-top:7px}
@@ -224,7 +229,7 @@
   .sect-t{font-size:12.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
     color:var(--muted);margin:16px 2px 8px}
 
-  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;gap:8px;
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;gap:8px;
     padding:8px 14px calc(8px + env(safe-area-inset-bottom));
     background:var(--bg);border-top:1px solid var(--line)}
   .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;
@@ -332,6 +337,7 @@
   <button class="sitem" data-menu="save">📅 Сохранить день</button>
   <button class="sitem" data-menu="newweek">🔄 Начать новую неделю</button>
   <button class="sitem" data-menu="restorezones">↩︎ Вернуть скрытые зоны</button>
+  <button class="sitem" data-menu="restorepoints">↩︎ Вернуть удалённые точки</button>
   <button class="sitem" data-menu="export">⬇︎ Сохранить копию данных</button>
   <button class="sitem" data-menu="import">⬆︎ Загрузить данные из файла</button>
   <button class="sitem danger" data-menu="reset">↺ Сбросить все статусы</button>
@@ -348,6 +354,21 @@
   </div>
   <div id="dateBody"></div>
   <button class="closebtn" id="dateClose2">Закрыть</button>
+</div>
+
+<div class="sheet-bg" id="pointBg"></div>
+<div class="sheet" id="pointSheet">
+  <div class="grab" id="pointGrab"></div>
+  <div class="sheet-head">
+    <div class="sheet-title" id="pointTitle">Точка</div>
+    <button class="xclose" id="pointClose" aria-label="Закрыть">✕</button>
+  </div>
+  <label class="field">Название<input id="pfName" type="text" autocomplete="off"></label>
+  <label class="field">Подпись / место<input id="pfSub" type="text" autocomplete="off"></label>
+  <label class="field">Оплата<input id="pfPay" type="text" autocomplete="off"></label>
+  <label class="field">Адрес<input id="pfAddr" type="text" autocomplete="off"></label>
+  <label class="field">Телефон<input id="pfPhone" type="tel" inputmode="tel" autocomplete="off"></label>
+  <button class="closebtn" id="pointSave" style="background:var(--brand);color:var(--brand-ink)">Сохранить</button>
 </div>
 
 <div class="sheet-bg" id="zoneBg"></div>
@@ -419,6 +440,8 @@ function load(){
     dayTasks: s.dayTasks || {},
     extras: s.extras || {},
     extraZones: s.extraZones || {},
+    edits: s.edits || {},
+    removed: s.removed || {},
     zoneTitles: s.zoneTitles || {},
     zoneNotes: s.zoneNotes || {},
     zoneHidden: s.zoneHidden || {},
@@ -470,7 +493,7 @@ function zonesOf(key){
       id, base: true,
       title: zoneTitleOf(key, id) || z.title,
       note: zoneNoteOf(key, id, z.note),
-      points: z.points.concat(extras.filter(e => e.zi === id)),
+      points: z.points.concat(extras.filter(e => e.zi === id)).map(applyEdits).filter(p => !state.removed[p.id]),
     };
   });
   (state.extraZones[key] || []).forEach(z => {
@@ -478,15 +501,22 @@ function zonesOf(key){
       id: z.id, base: false,
       title: zoneTitleOf(key, z.id) || z.title,
       note: zoneNoteOf(key, z.id, z.note || ""),
-      points: extras.filter(e => e.zi === z.id),
+      points: extras.filter(e => e.zi === z.id).map(applyEdits).filter(p => !state.removed[p.id]),
     });
   });
   const ids = new Set(list.map(z => z.id));
   const orphan = extras.filter(e => !e.zi || !ids.has(e.zi));
-  if(orphan.length) list.push({ id: "zorphan", base: false, title: "Без зоны", note: "", points: orphan });
+  if(orphan.length) list.push({ id: "zorphan", base: false, title: "Без зоны", note: "", points: orphan.map(applyEdits).filter(p => !state.removed[p.id]) });
   return list.filter(z => !hidden.includes(z.id));
 }
-const pointsOf = key => zonesOf(key).flatMap(z => z.points);
+function applyEdits(p){
+  const e = state.edits[p.id];
+  if(!e) return p;
+  const out = { ...p };
+  ["n","s","pay"].forEach(k => { if(e[k] !== undefined) out[k] = e[k]; });
+  return out;
+}
+const pointsOf = key => zonesOf(key).flatMap(z => z.points).filter(p => !state.removed[p.id]);
 function countsOf(key){
   const c = { order: 0, noorder: 0, pending: 0, total: 0 };
   pointsOf(key).forEach(p => { c[statusOf(p)]++; c.total++; });
@@ -610,7 +640,7 @@ function renderDayHead(){
 
 function compactRow(p){
   const st = statusOf(p), a = addrOf(p);
-  return `<div class="crow s-${st}" data-id="${p.id}" data-act="expand">
+  return `<div class="crow s-${st}" data-id="${p.id}" data-act="toggle">
     <span class="cdot ${st}"></span>
     <div class="cinfo">
       <div class="cn">${esc(p.n)}</div>
@@ -626,10 +656,10 @@ function pointCard(p){
   const extra = !!p.extra;
   return `<article class="card s-${st}" data-id="${p.id}">
     <div class="row">
-      <div style="min-width:0"><div class="name">${esc(p.n)}</div>
+      <div style="min-width:0"><div class="name ${state.compact ? "tapname" : ""}" ${state.compact ? 'data-act="collapse"' : ""}>${esc(p.n)}</div>
       ${p.s ? `<div class="sub">${esc(p.s)}</div>` : ""}</div>
       <span class="pill ${ST[st].cls}" style="margin-left:auto">${ST[st].short} ${ST[st].label}</span>
-      ${extra ? `<button class="xdel" data-act="del" title="Удалить точку">✕</button>` : ""}
+      <button class="xdel" data-act="del" title="Удалить точку">✕</button>
     </div>
     ${flags ? `<div class="flags">${flags}</div>` : ""}
     ${p.pay ? `<div class="pay">${esc(p.pay)}</div>` : ""}
@@ -656,6 +686,7 @@ function pointCard(p){
     <div class="mini">
       <button class="btn ${open ? "sel" : ""}" data-act="note">📝 Заметка</button>
       <button class="btn" data-act="call">📞 Позвонить</button>
+      <button class="btn" data-act="edit">✎ Изменить</button>
       ${state.compact ? `<button class="btn" data-act="collapse">Свернуть</button>` : ""}
     </div>
   </article>`;
@@ -675,7 +706,7 @@ function renderZones(){
       if(ui.filter !== "all" && st !== ui.filter) return false;
       return true;
     });
-    if(!pts.length && q) return;
+    if(!pts.length && (q || ui.filter !== "all")) return;
     shown += pts.length;
     const hidden = ui.collapsed.has(state.day + ":" + z.id);
     const doneN = z.points.filter(p => statusOf(p) === "order").length;
@@ -862,10 +893,46 @@ function isExtra(id){
   return null;
 }
 function delPoint(id){
-  const k = isExtra(id); if(!k) return;
-  if(!confirm("Удалить эту точку?")) return;
-  state.extras[k] = state.extras[k].filter(p => p.id !== id);
-  save(); snapshot(k); renderDay(); toast("Точка удалена");
+  const p = findPoint(id); if(!p) return;
+  const name = p.n || "эту точку";
+  const extraKey = isExtra(id);
+  if(!confirm("Удалить точку «" + name + "»?\n\nВернуть можно через ⋯ → Вернуть удалённые точки.")) return;
+  if(extraKey){
+    state.extras[extraKey] = state.extras[extraKey].filter(x => x.id !== id);
+  } else {
+    state.removed[id] = true;
+  }
+  save(); snapshot(state.day); renderDay(); toast("Точка удалена");
+}
+
+/* ---------- редактор точки ---------- */
+let editPointId = null;
+function openPointEditor(id){
+  const p = findPoint(id); if(!p) return;
+  editPointId = id;
+  $("#pointTitle").textContent = p.n || "Точка";
+  $("#pfName").value = p.n || "";
+  $("#pfSub").value = p.s || "";
+  $("#pfPay").value = p.pay || "";
+  $("#pfAddr").value = addrOf(p);
+  $("#pfPhone").value = phoneOf(p);
+  $("#pointBg").classList.add("on"); $("#pointSheet").classList.add("on");
+}
+function closePointEditor(){
+  $("#pointSheet").classList.remove("on"); $("#pointBg").classList.remove("on");
+}
+function savePoint(){
+  if(!editPointId) return;
+  const id = editPointId;
+  const n = $("#pfName").value.trim();
+  if(!n){ toast("Название не может быть пустым"); return; }
+  const s = $("#pfSub").value.trim(), pay = $("#pfPay").value.trim();
+  const a = $("#pfAddr").value.trim(), ph = $("#pfPhone").value.trim();
+  state.edits[id] = state.edits[id] || {};
+  state.edits[id].n = n; state.edits[id].s = s; state.edits[id].pay = pay;
+  if(a) state.addrs[id] = a; else delete state.addrs[id];
+  if(ph) state.phones[id] = ph; else delete state.phones[id];
+  save(); closePointEditor(); renderDay(); toast("Точка обновлена");
 }
 
 /* ---------- действия с зонами ---------- */
@@ -980,8 +1047,9 @@ $("#zones").addEventListener("click", e => {
   if(!act || !card) return;
   const id = card.dataset.id, a = act.dataset.act;
   if(a === "order" || a === "noorder" || a === "pending") return setStatus(id, a);
-  if(a === "expand"){ ui.expanded.add(id); return renderZones(); }
+  if(a === "toggle"){ ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id); return renderZones(); }
   if(a === "collapse"){ ui.expanded.delete(id); return renderZones(); }
+  if(a === "edit") return openPointEditor(id);
   if(a === "note") return toggleNote(id);
   if(a === "addr") return editAddr(id);
   if(a === "phone") return editPhone(id);
@@ -1052,6 +1120,12 @@ $("#zoneAddPoint").addEventListener("click", () => {
   setTimeout(() => addPoint(zid), 60);
 });
 
+/* точка */
+$("#pointBg").addEventListener("click", closePointEditor);
+$("#pointClose").addEventListener("click", closePointEditor);
+$("#pointGrab").addEventListener("click", closePointEditor);
+$("#pointSave").addEventListener("click", savePoint);
+
 /* задача */
 $("#taskBg").addEventListener("click", closeTaskEditor);
 $("#taskClose").addEventListener("click", closeTaskEditor);
@@ -1108,6 +1182,9 @@ sheet.addEventListener("click", e => {
     newWeekManual();
   }
   if(what === "restorezones") restoreZones();
+  if(what === "restorepoints"){
+    state.removed = {}; save(); renderDay(); toast("Удалённые точки возвращены");
+  }
   if(what === "export") exportJson();
   if(what === "import") $("#fileIn").click();
   if(what === "reset"){
@@ -1138,7 +1215,8 @@ $("#fileIn").addEventListener("change", e => {
         weekStart: s.weekStart || weekStartIso(),
         status: s.status || {}, notes: s.notes || {}, addrs: s.addrs || {}, phones: s.phones || {},
         checks: s.checks || {}, history: s.history || {}, dayTasks: s.dayTasks || {},
-        extras: s.extras || {}, extraZones: s.extraZones || {}, zoneTitles: s.zoneTitles || {},
+        extras: s.extras || {}, extraZones: s.extraZones || {}, edits: s.edits || {}, removed: s.removed || {},
+        zoneTitles: s.zoneTitles || {},
         zoneNotes: s.zoneNotes || {}, zoneHidden: s.zoneHidden || {},
         checksList: Array.isArray(s.checksList) ? s.checksList : defaultChecks(),
         compact: !!s.compact, day: state.day,
