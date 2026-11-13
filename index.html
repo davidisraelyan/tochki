@@ -140,6 +140,12 @@
   .field input{display:block;width:100%;margin-top:5px;font-size:16px;padding:11px 12px;
     border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);outline:none}
   .field input:focus{border-color:var(--brand)}
+  .field textarea{display:block;width:100%;margin-top:5px;font-size:16px;padding:11px 12px;
+    border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);
+    outline:none;min-height:88px;resize:vertical}
+  .field textarea:focus{border-color:var(--brand)}
+  .modal-actions{display:flex;gap:8px;margin-top:14px}
+  .modal-actions .closebtn{flex:1;margin-top:0}
   .tapname{cursor:pointer}
   .xdel{width:26px;height:26px;border-radius:8px;background:var(--red-bg);color:var(--red);
     font-size:13px;flex:none;display:grid;place-items:center;margin-left:6px}
@@ -419,6 +425,17 @@
   <textarea class="note" id="taskText" style="min-height:120px" placeholder="Что важно не забыть в этот день…"></textarea>
   <button class="closebtn" id="taskSave" style="background:var(--brand);color:var(--brand-ink)">Сохранить</button>
   <button class="closebtn" id="taskReset">Вернуть исходный текст</button>
+</div>
+
+<div class="sheet-bg" id="modalBg"></div>
+<div class="sheet" id="modalSheet">
+  <div class="grab" id="modalGrab"></div>
+  <div class="sheet-head"><div class="sheet-title" id="modalTitle">—</div></div>
+  <div id="modalFields"></div>
+  <div class="modal-actions">
+    <button class="closebtn" id="modalCancel">Отмена</button>
+    <button class="closebtn" id="modalOk">Сохранить</button>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -936,29 +953,37 @@ function toggleNote(id){
   else { ui.openNotes.add(id); ui.focusNote = id; ui.expanded.add(id); }
   renderZones();
 }
-function editAddr(id){
+async function editAddr(id){
   const p = findPoint(id); if(!p) return;
-  const v = prompt("Адрес точки (город, улица, дом):", addrOf(p));
-  if(v === null) return;
-  const t = v.trim();
+  const r = await askDialog({ title: "Адрес точки", okText: "Сохранить",
+    fields: [{ label: "Адрес", value: addrOf(p), placeholder: "город, улица, дом" }] });
+  if(!r) return;
+  const t = (r[0] || "").trim();
   if(t) state.addrs[id] = t; else delete state.addrs[id];
   save(); renderZones();
 }
-function editPhone(id){
+async function editPhone(id){
   const p = findPoint(id); if(!p) return;
-  const v = prompt("Телефон:", phoneOf(p));
-  if(v === null) return;
-  const t = v.trim();
+  const r = await askDialog({ title: "Телефон", okText: "Сохранить",
+    fields: [{ label: "Номер", value: phoneOf(p), type: "tel", inputmode: "tel", placeholder: "+7 …" }] });
+  if(!r) return;
+  const t = (r[0] || "").trim();
   if(t) state.phones[id] = t; else delete state.phones[id];
   save(); renderZones();
 }
-function addPoint(zid){
-  const name = prompt("Название новой точки:");
-  if(!name || !name.trim()) return;
-  const addr = prompt("Адрес (можно пропустить):", "") || "";
+async function addPoint(zid){
+  const r = await askDialog({ title: "Новая точка", okText: "Добавить",
+    fields: [
+      { label: "Название", value: "", placeholder: "ИП Иванов / магазин" },
+      { label: "Адрес (можно пропустить)", value: "", placeholder: "улица, дом" },
+      { label: "Оплата (необязательно)", value: "", placeholder: "💵 / 💳 безнал" },
+    ] });
+  if(!r) return;
+  const name = (r[0] || "").trim();
+  if(!name){ toast("Название не может быть пустым"); return; }
   const id = "x" + Date.now().toString(36);
   (state.extras[state.day] = state.extras[state.day] || []).push({
-    id, n: name.trim(), a: addr.trim(), s: "", pay: "", st: "pending", extra: true, zi: zid,
+    id, n: name, a: (r[1] || "").trim(), pay: (r[2] || "").trim(), s: "", st: "pending", extra: true, zi: zid,
   });
   save(); snapshot(state.day); renderDay(); toast("Точка добавлена");
 }
@@ -968,11 +993,13 @@ function isExtra(id){
   }
   return null;
 }
-function delPoint(id){
+async function delPoint(id){
   const p = findPoint(id); if(!p) return;
   const name = p.n || "эту точку";
   const extraKey = isExtra(id);
-  if(!confirm("Удалить точку «" + name + "»?\n\nВернуть можно через ⋯ → Вернуть удалённые точки.")) return;
+  const ok = await confirmDialog({ title: "Удалить точку?",
+    text: "«" + name + "»\n\nВернуть можно через ⋯ → Вернуть удалённые точки.", okText: "Удалить" });
+  if(!ok) return;
   if(extraKey){
     state.extras[extraKey] = state.extras[extraKey].filter(x => x.id !== id);
   } else {
@@ -1037,25 +1064,29 @@ function openZoneMenu(zid){
 function closeZoneMenu(){
   $("#zoneSheet").classList.remove("on"); $("#zoneBg").classList.remove("on");
 }
-function renameZone(){
+async function renameZone(){
   const z = zoneById(state.day, zoneMenuZid); if(!z) return;
-  const v = prompt("Название зоны:", z.title);
-  if(v === null) return;
-  const t = v.trim();
+  const r = await askDialog({ title: "Название зоны", okText: "Сохранить",
+    fields: [{ label: "Название", value: z.title }] });
+  if(!r) return;
+  const t = (r[0] || "").trim();
   (state.zoneTitles[state.day] = state.zoneTitles[state.day] || {})[zoneMenuZid] = t || z.title;
   save(); renderDay(); closeZoneMenu(); toast("Название сохранено");
 }
-function editZoneNote(){
+async function editZoneNote(){
   const z = zoneById(state.day, zoneMenuZid); if(!z) return;
-  const v = prompt("Заметка зоны:", z.note);
-  if(v === null) return;
-  (state.zoneNotes[state.day] = state.zoneNotes[state.day] || {})[zoneMenuZid] = v.trim();
+  const r = await askDialog({ title: "Заметка зоны", okText: "Сохранить",
+    fields: [{ label: "Текст", value: z.note, multiline: true }] });
+  if(!r) return;
+  (state.zoneNotes[state.day] = state.zoneNotes[state.day] || {})[zoneMenuZid] = (r[0] || "").trim();
   save(); renderDay(); closeZoneMenu();
 }
-function deleteZone(){
+async function deleteZone(){
   const z = zoneById(state.day, zoneMenuZid); if(!z) return;
   if(z.id === "zorphan"){ toast("Эту группу удалить нельзя"); return; }
-  if(!confirm("Удалить зону «" + z.title + "» из этого дня? Точки внутри тоже исчезнут (вернуть можно через ⋯).")) return;
+  const ok = await confirmDialog({ title: "Удалить зону?",
+    text: "«" + z.title + "»\n\nТочки внутри тоже исчезнут. Вернуть можно через ⋯.", okText: "Удалить" });
+  if(!ok) return;
   if(z.base){
     (state.zoneHidden[state.day] = state.zoneHidden[state.day] || []).push(z.id);
   } else {
@@ -1064,11 +1095,13 @@ function deleteZone(){
   }
   save(); renderDay(); closeZoneMenu(); toast("Зона удалена");
 }
-function addZone(){
-  const v = prompt("Название новой зоны:");
-  if(!v || !v.trim()) return;
+async function addZone(){
+  const r = await askDialog({ title: "Новая зона", okText: "Добавить",
+    fields: [{ label: "Название", value: "", placeholder: "например: Зона 9 · Центр" }] });
+  const v = r && (r[0] || "").trim();
+  if(!v) return;
   const id = "ez" + Date.now().toString(36);
-  (state.extraZones[state.day] = state.extraZones[state.day] || []).push({ id, title: v.trim(), note: "" });
+  (state.extraZones[state.day] = state.extraZones[state.day] || []).push({ id, title: v, note: "" });
   save(); renderDay(); toast("Зона добавлена");
 }
 function restoreZones(){
@@ -1095,6 +1128,53 @@ function saveTask(){
   save(); closeTaskEditor(); renderDay();
     toast("Сохранено");
 }
+
+/* ---------- встроенные диалоги (без системных окон) ---------- */
+let modalResolve = null;
+function modalClose(v){
+  $("#modalSheet").classList.remove("on"); $("#modalBg").classList.remove("on");
+  const r = modalResolve; modalResolve = null;
+  if(r) r(v);
+}
+function modalOpen(opts){
+  return new Promise(resolve => {
+    modalResolve = resolve;
+    $("#modalTitle").textContent = opts.title || "";
+    const out = [];
+    if(opts.text) out.push(`<div class="hint" style="padding:2px 6px 10px;font-size:14px;line-height:1.45;white-space:pre-line">${esc(opts.text)}</div>`);
+    (opts.fields || []).forEach((f, i) => {
+      out.push(`<label class="field">${esc(f.label || "")}` +
+        (f.multiline
+          ? `<textarea data-mi="${i}" placeholder="${esc(f.placeholder || "")}">${esc(f.value || "")}</textarea>`
+          : `<input data-mi="${i}" type="${f.type || "text"}" inputmode="${f.inputmode || "text"}" value="${esc(f.value || "")}" placeholder="${esc(f.placeholder || "")}" autocomplete="off">`) +
+        `</label>`);
+    });
+    $("#modalFields").innerHTML = out.join("");
+    $("#modalOk").textContent = opts.okText || "Сохранить";
+    $("#modalOk").style.background = opts.danger ? "var(--red)" : "var(--brand)";
+    $("#modalOk").style.color = opts.danger ? "#fff" : "var(--brand-ink)";
+    $("#modalCancel").textContent = opts.cancelText || "Отмена";
+    $("#modalCancel").hidden = !!opts.hideCancel;
+    $("#modalBg").classList.add("on"); $("#modalSheet").classList.add("on");
+    setTimeout(() => { const el = $("#modalFields [data-mi]"); if(el) el.focus(); }, 130);
+  });
+}
+async function askDialog(opts){
+  const ok = await modalOpen(opts);
+  if(ok !== true) return null;
+  return Array.from(document.querySelectorAll("#modalFields [data-mi]")).map(el => el.value);
+}
+async function confirmDialog(opts){
+  const ok = await modalOpen({ okText: opts.okText || "Удалить", danger: true, ...opts });
+  return ok === true;
+}
+function infoDialog(opts){
+  return modalOpen({ okText: opts.okText || "Понятно", hideCancel: true, danger: false, ...opts });
+}
+$("#modalOk").addEventListener("click", () => modalClose(true));
+$("#modalCancel").addEventListener("click", () => modalClose(null));
+$("#modalBg").addEventListener("click", () => modalClose(null));
+$("#modalGrab").addEventListener("click", () => modalClose(null));
 
 /* ---------- обработчики ---------- */
 $("#daychips").addEventListener("click", e => {
@@ -1198,12 +1278,14 @@ $("#dateBody").addEventListener("input", e => {
   clearTimeout(noteTimer);
   noteTimer = setTimeout(() => { save(); renderCal(); }, 400);
 });
-$("#dateBody").addEventListener("click", e => {
+$("#dateBody").addEventListener("click", async e => {
   if(!openDateKey) return;
   if(e.target.closest("[data-dtodoadd]")){
-    const v = prompt("Задача на этот день:");
-    if(v && v.trim()){
-      (state.dayTodos[openDateKey] = state.dayTodos[openDateKey] || []).push({ id: "t" + Date.now().toString(36), text: v.trim(), done: false });
+    const r = await askDialog({ title: "Задача на этот день", okText: "Добавить",
+      fields: [{ label: "Задача", value: "", multiline: true }] });
+    const v = r && (r[0] || "").trim();
+    if(v){
+      (state.dayTodos[openDateKey] = state.dayTodos[openDateKey] || []).push({ id: "t" + Date.now().toString(36), text: v, done: false });
       save(); renderCal(); openDate(openDateKey);
     }
     return;
@@ -1254,11 +1336,13 @@ $("#taskSave").addEventListener("click", saveTask);
 $("#taskReset").addEventListener("click", () => { $("#taskText").value = dayObj(taskEditKey).task || ""; });
 
 /* чек-лист */
-$("#view-tasks").addEventListener("click", e => {
+$("#view-tasks").addEventListener("click", async e => {
   if(e.target.closest("#tAdd")){
-    const v = prompt("Задача на этот день:");
-    if(v && v.trim()){
-      (state.dayTodos[taskIso] = state.dayTodos[taskIso] || []).push({ id: "t" + Date.now().toString(36), text: v.trim(), done: false });
+    const r = await askDialog({ title: "Задача на этот день", okText: "Добавить",
+      fields: [{ label: "Задача", value: "", multiline: true }] });
+    const v = r && (r[0] || "").trim();
+    if(v){
+      (state.dayTodos[taskIso] = state.dayTodos[taskIso] || []).push({ id: "t" + Date.now().toString(36), text: v, done: false });
       save(); renderTasksTab(); renderDay();
     }
     return;
@@ -1306,13 +1390,14 @@ const sheet = $("#sheet"), sheetBg = $("#sheetBg");
 function openSheet(v){ sheet.classList.toggle("on", v); sheetBg.classList.toggle("on", v); }
 $("#menuBtn").addEventListener("click", () => openSheet(true));
 sheetBg.addEventListener("click", () => openSheet(false));
-sheet.addEventListener("click", e => {
+sheet.addEventListener("click", async e => {
   const b = e.target.closest("[data-menu]"); if(!b) return;
   const what = b.dataset.menu;
   openSheet(false);
   if(what === "save"){ snapshot(state.day); toast("День сохранён"); }
   if(what === "newweek"){
-    if(!confirm("Начать новую неделю? Статусы обнулятся, точки и адреса останутся. Прошлая неделя сохранится в календаре.")) return;
+    if(!await confirmDialog({ title: "Начать новую неделю?", okText: "Начать",
+      text: "Статусы обнулятся, точки и адреса останутся. Прошлая неделя сохранится в календаре." })) return;
     newWeekManual();
   }
   if(what === "restorezones") restoreZones();
@@ -1323,7 +1408,8 @@ sheet.addEventListener("click", e => {
   if(what === "export") exportJson();
   if(what === "import") $("#fileIn").click();
   if(what === "reset"){
-    if(!confirm("Сбросить статусы точек (🟢/🔴/⬜)? Заметки и адреса останутся.")) return;
+    if(!await confirmDialog({ title: "Сбросить статусы?", okText: "Сбросить",
+      text: "Все 🟢/🔴/⬜ обнулятся в текущей неделе. Заметки и адреса останутся." })) return;
     state.status = {}; save(); snapshot(state.day); renderDay(); toast("Статусы сброшены");
   }
 });
@@ -1382,11 +1468,11 @@ async function offlineStatus(){
     const name = keys.find(k => k.indexOf("tochki") === 0) || keys[keys.length - 1];
     if(name){ const c = await caches.open(name); files = (await c.keys()).length; }
   }catch(_){}
-  alert("Офлайн-режим\n\n" +
-    (active ? "Кэш активен — приложение откроется без сети ✅" : "Кэш ещё не готов. Откройте приложение один раз при интернете и добавьте его на экран «Домой».") +
-    "\nФайлов в кэше: " + files +
-    "\nСеть сейчас: " + (navigator.onLine ? "есть" : "нет") +
-    "\n\nДанные (статусы, заметки, адреса) хранятся в памяти телефона и без сети работают как обычно.");
+  infoDialog({ title: "Офлайн-режим",
+    text: (active ? "Кэш активен — приложение откроется без сети ✅" : "Кэш ещё не готов: откройте приложение один раз при интернете и добавьте его на экран «Домой».") +
+      "\nФайлов в кэше: " + files +
+      "\nСеть сейчас: " + (navigator.onLine ? "есть" : "нет") +
+      "\n\nДанные (статусы, заметки, адреса) хранятся в памяти телефона и без сети работают как обычно." });
 }
 
 /* ---------- старт ---------- */
