@@ -205,7 +205,9 @@
     display:grid;place-items:center;box-shadow:var(--shadow)}
   .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
   .cal-wd{text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding:4px 0}
-  .cal-cell{aspect-ratio:1/1.05;min-width:0;overflow:hidden;border-radius:10px;border:1px solid transparent;background:var(--card);
+  .cal-cell.has-note::after{content:"";position:absolute;top:6px;right:6px;width:6px;height:6px;
+    border-radius:50%;background:var(--brand)}
+  .cal-cell{position:relative;aspect-ratio:1/1.05;min-width:0;overflow:hidden;border-radius:10px;border:1px solid transparent;background:var(--card);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px}
   .cal-cell.weekend{opacity:.35}
   .cal-cell.today{border-color:var(--brand)}
@@ -446,6 +448,9 @@ function load(){
     extraZones: s.extraZones || {},
     edits: s.edits || {},
     removed: s.removed || {},
+    order: s.order || {},
+    dayNotes: s.dayNotes || {},
+    dayTodos: s.dayTodos || {},
     zoneTitles: s.zoneTitles || {},
     zoneNotes: s.zoneNotes || {},
     zoneHidden: s.zoneHidden || {},
@@ -479,6 +484,14 @@ const phoneOf  = p => state.phones[p.id] || p.phone || "";
 const dayObj   = key => DAYS.find(d => d.key === key) || DAYS[0];
 
 /* зоны: базовые из data.js + добавленные вручную, с правками названий */
+function orderedPoints(day, zid, arr){
+  const ord = (state.order[day] || {})[zid];
+  if(!ord || !ord.length) return arr;
+  const pos = new Map(ord.map((id, i) => [id, i]));
+  const big = 1e6;
+  return arr.slice().sort((a, b) =>
+    (pos.has(a.id) ? pos.get(a.id) : big) - (pos.has(b.id) ? pos.get(b.id) : big));
+}
 function zoneTitleOf(key, zid){
   const m = state.zoneTitles[key] || {};
   return m[zid];
@@ -497,7 +510,7 @@ function zonesOf(key){
       id, base: true,
       title: zoneTitleOf(key, id) || z.title,
       note: zoneNoteOf(key, id, z.note),
-      points: z.points.concat(extras.filter(e => e.zi === id)).map(applyEdits).filter(p => !state.removed[p.id]),
+      points: orderedPoints(key, id, z.points.concat(extras.filter(e => e.zi === id)).map(applyEdits).filter(p => !state.removed[p.id])),
     };
   });
   (state.extraZones[key] || []).forEach(z => {
@@ -505,7 +518,7 @@ function zonesOf(key){
       id: z.id, base: false,
       title: zoneTitleOf(key, z.id) || z.title,
       note: zoneNoteOf(key, z.id, z.note || ""),
-      points: extras.filter(e => e.zi === z.id).map(applyEdits).filter(p => !state.removed[p.id]),
+      points: orderedPoints(key, z.id, extras.filter(e => e.zi === z.id).map(applyEdits).filter(p => !state.removed[p.id])),
     });
   });
   const ids = new Set(list.map(z => z.id));
@@ -690,6 +703,8 @@ function pointCard(p){
       <button class="btn ${open ? "sel" : ""}" data-act="note">📝 Заметка</button>
       <button class="btn" data-act="call">📞 Позвонить</button>
       <button class="btn" data-act="edit">✎ Изменить</button>
+      <button class="btn" data-act="up" title="Выше">↑</button>
+      <button class="btn" data-act="down" title="Ниже">↓</button>
       ${state.compact ? `<button class="btn" data-act="collapse">Свернуть</button>` : ""}
     </div>
   </article>`;
@@ -777,7 +792,8 @@ function renderCal(){
       const done = c.order + c.noorder;
       inner += `<div class="s">${c.order}/${c.total}</div><div class="dot ${c.order === c.total ? "" : (done > 0 ? "part" : "none")}"></div>`;
     }
-    cells += `<button class="cal-cell ${wd > 4 ? "weekend" : ""} ${key === today ? "today" : ""} ${c ? "filled" : ""}" data-date="${key}">${inner}</button>`;
+    const hasExtra = !!(state.dayNotes[key] || (state.dayTodos[key] || []).length);
+    cells += `<button class="cal-cell ${wd > 4 ? "weekend" : ""} ${key === today ? "today" : ""} ${c ? "filled" : ""} ${hasExtra ? "has-note" : ""}" data-date="${key}">${inner}</button>`;
   }
   const total = startPad + daysIn;
   for(let i = total; i % 7 !== 0; i++) cells += `<div class="cal-cell empty"></div>`;
@@ -795,7 +811,9 @@ function renderCal(){
     </div>`;
 }
 
+let openDateKey = null;
 function openDate(key){
+  openDateKey = key;
   const date = new Date(key + "T00:00:00");
   const diff = Math.round((date - mondayOf(new Date())) / 86400000);
   let h = null, live = false;
@@ -807,30 +825,50 @@ function openDate(key){
   if(h && !Array.isArray(h.items)) h.items = [];
   const title = date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" }) + (live ? " · сейчас" : "");
   $("#dateTitle").textContent = title;
+
+  let body = dayExtraHtml(key);
   if(!h){
-    $("#dateBody").innerHTML = `<div class="hint">За этот день записей нет.</div>`;
+    body += `<div class="sect-t">Точки за день</div><div class="hint" style="padding:0 6px">Записей по точкам нет.</div>`;
   } else {
     const c = h.counts;
     const groups = [["order","🟢 Заказали"],["noorder","🔴 Не заказали"],["pending","⬜ Не были"]];
-    $("#dateBody").innerHTML = `
-      <div class="hint" style="padding:0 6px 10px">Заказов: <b>${c.order}</b> · без заказа: <b>${c.noorder}</b> · не были: <b>${c.pending}</b></div>
-      ${groups.map(([k, label]) => {
+    body += `<div class="sect-t">Точки за день</div>
+      <div class="hint" style="padding:0 6px 4px">Заказов: <b>${c.order}</b> · без заказа: <b>${c.noorder}</b> · не были: <b>${c.pending}</b></div>` +
+      groups.map(([k, label]) => {
         const items = h.items.filter(i => i.s === k);
         if(!items.length) return "";
         return `<div class="sect-t">${label} · ${items.length}</div>` +
           items.map(i => `<div class="ditem"><span class="n">${esc(i.n)}</span>
             ${i.note ? `<span style="color:var(--muted);font-size:12.5px">${esc(i.note)}</span>` : ""}</div>`).join("");
-      }).join("")}
-      ${live ? `<button class="closebtn" id="jumpDay">Открыть этот день в списке</button>` : ""}`;
+      }).join("");
     if(live){
+      body += `<button class="closebtn" id="jumpDay">Открыть этот день в списке</button>`;
       const dk = ["mon","tue","wed","thu","fri"][diff];
-      $("#jumpDay").addEventListener("click", () => {
-        closeDate(); state.day = dk; save(); renderDay();
-        document.querySelector('.tab[data-tab="day"]').click();
-      });
+      setTimeout(() => {
+        const j = document.getElementById("jumpDay");
+        if(j) j.addEventListener("click", () => {
+          closeDate(); state.day = dk; save(); renderDay();
+          document.querySelector('.tab[data-tab="day"]').click();
+        });
+      }, 0);
     }
   }
+  $("#dateBody").innerHTML = body;
   $("#dateSheet").classList.add("on"); $("#dateBg").classList.add("on");
+}
+
+function dayExtraHtml(key){
+  const note = state.dayNotes[key] || "";
+  const todos = state.dayTodos[key] || [];
+  return `<div class="sect-t">Заметка на этот день</div>
+    <textarea class="note" data-dnote placeholder="Что важно не забыть в этот день…">${esc(note)}</textarea>
+    <div class="sect-t">Задачи на этот день</div>
+    ${todos.map(t => `<div class="task ${t.done ? "done" : ""}" data-dtodo="${t.id}">
+      <div class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>
+      <div class="txt">${esc(t.text)}</div>
+      <button class="tiny danger" data-dtododel="${t.id}">✕</button>
+    </div>`).join("")}
+    <button class="addzone" data-dtodoadd="1">＋ задача на этот день</button>`;
 }
 
 /* ---------- задачи ---------- */
@@ -906,6 +944,20 @@ function delPoint(id){
     state.removed[id] = true;
   }
   save(); snapshot(state.day); renderDay(); toast("Точка удалена");
+}
+
+function movePoint(id, dir){
+  const day = state.day;
+  const z = zonesOf(day).find(zz => zz.points.some(p => p.id === id));
+  if(!z) return;
+  const ids = z.points.map(p => p.id);
+  const i = ids.indexOf(id), j = i + dir;
+  if(i < 0 || j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  state.order[day] = state.order[day] || {};
+  state.order[day][z.id] = ids;
+  save(); renderZones();
+  toast("Порядок сохранён");
 }
 
 /* ---------- редактор точки ---------- */
@@ -1053,6 +1105,8 @@ $("#zones").addEventListener("click", e => {
   if(a === "toggle"){ ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id); return renderZones(); }
   if(a === "collapse"){ ui.expanded.delete(id); return renderZones(); }
   if(a === "edit") return openPointEditor(id);
+  if(a === "up") return movePoint(id, -1);
+  if(a === "down") return movePoint(id, 1);
   if(a === "note") return toggleNote(id);
   if(a === "addr") return editAddr(id);
   if(a === "phone") return editPhone(id);
@@ -1102,6 +1156,34 @@ function closeDate(){
   $("#dateSheet").classList.remove("on");
   $("#dateBg").classList.remove("on");
 }
+$("#dateBody").addEventListener("input", e => {
+  const ta = e.target.closest("[data-dnote]");
+  if(!ta || !openDateKey) return;
+  state.dayNotes[openDateKey] = ta.value;
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => { save(); renderCal(); }, 400);
+});
+$("#dateBody").addEventListener("click", e => {
+  if(!openDateKey) return;
+  if(e.target.closest("[data-dtodoadd]")){
+    const v = prompt("Задача на этот день:");
+    if(v && v.trim()){
+      (state.dayTodos[openDateKey] = state.dayTodos[openDateKey] || []).push({ id: "t" + Date.now().toString(36), text: v.trim(), done: false });
+      save(); renderCal(); openDate(openDateKey);
+    }
+    return;
+  }
+  const del = e.target.closest("[data-dtododel]");
+  if(del){
+    state.dayTodos[openDateKey] = (state.dayTodos[openDateKey] || []).filter(t => t.id !== del.dataset.dtododel);
+    save(); renderCal(); openDate(openDateKey); return;
+  }
+  const t = e.target.closest("[data-dtodo]");
+  if(t){
+    const item = (state.dayTodos[openDateKey] || []).find(x => x.id === t.dataset.dtodo);
+    if(item){ item.done = !item.done; save(); renderCal(); openDate(openDateKey); }
+  }
+});
 $("#dateBg").addEventListener("click", closeDate);
 $("#dateClose").addEventListener("click", closeDate);
 $("#dateClose2").addEventListener("click", closeDate);
@@ -1220,6 +1302,7 @@ $("#fileIn").addEventListener("change", e => {
         status: s.status || {}, notes: s.notes || {}, addrs: s.addrs || {}, phones: s.phones || {},
         checks: s.checks || {}, history: s.history || {}, dayTasks: s.dayTasks || {},
         extras: s.extras || {}, extraZones: s.extraZones || {}, edits: s.edits || {}, removed: s.removed || {},
+        order: s.order || {}, dayNotes: s.dayNotes || {}, dayTodos: s.dayTodos || {},
         zoneTitles: s.zoneTitles || {},
         zoneNotes: s.zoneNotes || {}, zoneHidden: s.zoneHidden || {},
         checksList: Array.isArray(s.checksList) ? s.checksList : defaultChecks(),
