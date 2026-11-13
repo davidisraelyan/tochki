@@ -202,6 +202,13 @@
     box-shadow:0 -10px 40px rgba(0,0,0,.25);max-height:82vh;overflow:auto}
   .sheet.on{transform:translateY(0)}
   .grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 12px}
+  .sheet-head{position:relative;padding:0 6px 10px}
+  .sheet-title{font-weight:700;font-size:17px;padding-right:44px;line-height:1.3}
+  .xclose{position:absolute;right:0;top:-4px;width:34px;height:34px;border-radius:50%;
+    background:var(--gray-bg);font-size:15px;font-weight:700;display:grid;place-items:center;color:var(--ink)}
+  .closebtn{display:block;width:100%;margin-top:14px;padding:13px;border-radius:12px;
+    background:var(--gray-bg);font-weight:700;font-size:15px;text-align:center}
+  .sheet{max-height:74vh}
   .sheet button.sitem{display:flex;width:100%;align-items:center;gap:12px;padding:14px 6px;font-size:16px;
     font-weight:600;border-bottom:1px solid var(--line);text-align:left}
   .sheet button.sitem:last-of-type{border-bottom:0}
@@ -294,9 +301,13 @@
 
 <div class="sheet-bg" id="dateBg"></div>
 <div class="sheet" id="dateSheet">
-  <div class="grab"></div>
-  <div style="font-weight:700;font-size:17px;padding:0 6px 10px" id="dateTitle">—</div>
+  <div class="grab" id="dateGrab"></div>
+  <div class="sheet-head">
+    <div class="sheet-title" id="dateTitle">—</div>
+    <button class="xclose" id="dateClose" aria-label="Закрыть">✕</button>
+  </div>
   <div id="dateBody"></div>
+  <button class="closebtn" id="dateClose2">Закрыть</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -559,6 +570,7 @@ function openDate(key){
     h = { counts: countsOf(dk), items: pointsOf(dk).map(p => ({ n: p.n, s: statusOf(p), note: noteOf(p) })) };
     live = true;
   } else h = state.history[key];
+  if(h && !Array.isArray(h.items)) h.items = [];
   const title = date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" }) + (live ? " · сейчас" : "");
   $("#dateTitle").textContent = title;
   if(!h){ $("#dateBody").innerHTML = `<div class="hint">За этот день записей нет.</div>`; }
@@ -623,6 +635,7 @@ $("#daychips").addEventListener("click", e => {
   snapshot(state.day);
   state.day = b.dataset.day; save();
   ui.openNotes.clear(); renderDay();
+  requestAnimationFrame(() => window.scrollTo(0, 0));
 });
 
 let noteTimer;
@@ -676,7 +689,15 @@ $("#calGrid").addEventListener("click", e => {
   const c = e.target.closest("[data-date]"); if(!c) return;
   openDate(c.dataset.date);
 });
-$("#dateBg").addEventListener("click", () => { $("#dateSheet").classList.remove("on"); $("#dateBg").classList.remove("on"); });
+function closeDate(){
+  $("#dateSheet").classList.remove("on");
+  $("#dateBg").classList.remove("on");
+}
+$("#dateBg").addEventListener("click", closeDate);
+$("#dateClose").addEventListener("click", closeDate);
+$("#dateClose2").addEventListener("click", closeDate);
+$("#dateGrab").addEventListener("click", closeDate);
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeDate(); });
 
 $("#checkList").addEventListener("click", e => {
   const t = e.target.closest("[data-check]"); if(!t) return;
