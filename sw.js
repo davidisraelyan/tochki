@@ -1,7 +1,7 @@
 /* Офлайн-кэш оболочки + обновляемость: документ берём из сети,
    при отсутствии сети — из кэша. Статика — из кэша с догрузкой. */
-const CACHE = "tochki-v2";
-const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
+const CACHE = "tochki-v3";
+const FILES = ["./", "./index.html", "./data.js", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
